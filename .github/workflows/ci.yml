@@ -1,0 +1,52 @@
+name: Testes
+
+# Roda a bateria de testes a cada push e em toda pull request. É este o check
+# verde que significa alguma coisa no projeto: ele compila o Java e executa os
+# testes de verdade.
+
+on:
+  # Só `main` no gatilho de push. Um branch com pull request aberta já é coberto
+  # pelo gatilho `pull_request`; listar "**" aqui fazia os dois dispararem e a
+  # PR aparecia com dois checks "testar" idênticos rodando lado a lado.
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+  pull_request:
+  workflow_dispatch:
+
+# Push novo na mesma PR cancela a execução anterior, que já ficou obsoleta.
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar o JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Compilar e testar
+        run: ./mvnw -B --no-transfer-progress verify
+
+      # O relatório fica disponível mesmo quando a bateria falha — é justamente
+      # aí que alguém precisa abrir para ver qual teste quebrou.
+      - name: Guardar o relatório dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-surefire
+          path: target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 14

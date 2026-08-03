@@ -1,0 +1,86 @@
+name: Radiografia do README (bot)
+
+# Mantém a seção "Radiografia do projeto" do README em dia com o código.
+#
+# O bot roda a bateria de testes antes de analisar o projeto, e não só para
+# saber se está verde: é assim que a contagem de testes no README vem de uma
+# execução real, lida do relatório do Surefire, em vez de um número contado no
+# código-fonte que ninguém verificou.
+#
+# **Commit só quando há dado novo.** O bloco do README carrega uma assinatura
+# SHA-256 do próprio conteúdo, calculada sem a data. Se nada mudou, a assinatura
+# bate, o script não escreve nada e o passo de commit não encontra diferença —
+# por isso o agendamento diário não enche o histórico de commits vazios.
+
+on:
+  push:
+    branches: [main]
+    # README.md fica de fora de propósito: o commit do próprio bot mexe só nele,
+    # e listá-lo aqui faria o bot se acordar sozinho em looping.
+    paths:
+      - "src/**"
+      - "pom.xml"
+      - ".github/scripts/readme_stats.py"
+      - ".github/workflows/readme-bot.yml"
+  schedule:
+    # Uma vez por dia, como rede de segurança para o caso de um push ter
+    # escapado do filtro acima. Agendamento sempre roda no branch padrão do
+    # repositório — se o padrão não for `main`, este gatilho não faz nada.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+# Duas execuções nunca reescrevem o README ao mesmo tempo.
+concurrency:
+  group: readme-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  radiografar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar o JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # continue-on-error: com a bateria vermelha o bot ainda deve atualizar o
+      # README — e o bloco vai dizer quantos testes quebraram, que é uma
+      # informação melhor do que um README parado no tempo. Quem falha alto é o
+      # workflow de Testes, não este.
+      - name: Rodar os testes (alimenta os números do README)
+        continue-on-error: true
+        run: ./mvnw -B --no-transfer-progress test
+
+      - name: Analisar o projeto e reescrever o bloco
+        run: python3 .github/scripts/readme_stats.py
+
+      - name: Commitar se houver dado novo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          if git diff --cached --quiet; then
+            echo "Nada mudou no projeto — sem commit."
+            exit 0
+          fi
+          git commit -m "chore(bot): atualiza a radiografia do README [skip ci]"
+          for i in 1 2 3 4; do
+            if git push; then exit 0; fi
+            echo "push falhou; refazendo em cima do remoto (tentativa $i)"
+            git pull --rebase --autostash origin main || true
+            sleep $((2 ** i))
+          done
+          echo "::error::não consegui enviar o commit após 4 tentativas"
+          exit 1
