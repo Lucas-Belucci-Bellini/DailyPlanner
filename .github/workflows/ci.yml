@@ -5,13 +5,20 @@ name: Testes
 # testes de verdade.
 
 on:
+  # Só `main` no gatilho de push. Um branch com pull request aberta já é coberto
+  # pelo gatilho `pull_request`; listar "**" aqui fazia os dois dispararem e a
+  # PR aparecia com dois checks "testar" idênticos rodando lado a lado.
   push:
-    branches: ["**"]
+    branches: [main]
     paths-ignore:
-      - "README.md"
       - "**/*.md"
   pull_request:
   workflow_dispatch:
+
+# Push novo na mesma PR cancela a execução anterior, que já ficou obsoleta.
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
