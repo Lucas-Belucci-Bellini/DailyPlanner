@@ -21,9 +21,9 @@ execucao sem novidade nao gera commit. Nao edite o que esta entre os
 marcadores: a proxima execucao sobrescreve.
 
 <!-- PROJETO:START -->
-<!-- PROJETO:ASSINATURA 79beeff54ab81e87 -->
+<!-- PROJETO:ASSINATURA 78b2ca050bf3fee2 -->
 
-> **Java 21** · **Spring Boot 3.5.5** · **10** classes Java · **1082** linhas · **7** rotas · **39** testes (todos passando)
+> **Java 21** · **Spring Boot 3.5.5** · **10** classes Java · **1082** linhas · **7** rotas · **39** testes
 
 > Nenhum arquivo `.js` no projeto: as páginas são montadas no servidor com Thymeleaf e toda a lógica roda em Java.
 
@@ -64,9 +64,9 @@ marcadores: a proxima execucao sobrescreve.
 
 ### Testes
 
-✅ todos passando — **39** testes executados.
+**39** métodos `@Test` no código.
 
-> Números lidos do relatório do Surefire, ou seja, de uma execução real de `./mvnw test` — não de uma contagem no código.
+> Contados no código-fonte: esta execução do bot não encontrou relatório do Surefire, então o resultado (passou/falhou) não foi verificado aqui.
 
 | Classe de teste | Testes |
 | :--- | ---: |
@@ -100,7 +100,7 @@ marcadores: a proxima execucao sobrescreve.
 
 </details>
 
-<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 03/08/2026 às 20:48 UTC.</sub>
+<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 03/08/2026 às 22:47 UTC.</sub>
 
 <!-- PROJETO:END -->
 
