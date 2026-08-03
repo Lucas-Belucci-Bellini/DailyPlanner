@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<!--
+  Pedacos de HTML reaproveitados pelas telas. Nada aqui vira uma pagina sozinho.
+-->
+<head th:fragment="cabecalho(titulo)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|${titulo} · Daily Planner|">Daily Planner</title>
+    <link rel="stylesheet" th:href="@{/css/estilo.css}">
+    <link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'&gt;&lt;text y='.9em' font-size='90'&gt;🗓️&lt;/text&gt;&lt;/svg&gt;">
+</head>
+<body>
+
+<footer th:fragment="rodape" class="rodape">
+    <p>Daily Planner · Java 21 + Spring Boot + Thymeleaf · paginas montadas no servidor</p>
+</footer>
+
+</body>
+</html>

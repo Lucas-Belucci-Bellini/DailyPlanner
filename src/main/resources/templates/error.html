@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/base :: cabecalho('Erro')}"></head>
+<body>
+<main class="pagina estreita">
+
+    <header class="topo">
+        <div>
+            <p class="sobrescrito">Daily Planner</p>
+            <h1>Algo saiu do lugar</h1>
+        </div>
+    </header>
+
+    <p class="aviso falha">
+        <span th:text="${status}">500</span>
+        <span th:text="${error}">Erro interno</span>
+    </p>
+
+    <p><a class="botao primario" th:href="@{/agenda}">Voltar para a agenda</a></p>
+
+    <footer th:replace="~{fragments/base :: rodape}"></footer>
+</main>
+</body>
+</html>
