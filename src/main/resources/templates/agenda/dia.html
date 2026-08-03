@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/base :: cabecalho('Agenda')}"></head>
+<body>
+<main class="pagina">
+
+    <header class="topo">
+        <div>
+            <p class="sobrescrito">Daily Planner</p>
+            <h1 th:text="${nomeDoDia}">segunda-feira, 3 de agosto de 2026</h1>
+        </div>
+        <a class="botao primario" th:href="@{/agenda/novo(data=${dia})}">+ Novo compromisso</a>
+    </header>
+
+    <p class="aviso sucesso" th:if="${mensagem}" th:text="${mensagem}"></p>
+    <p class="aviso falha" th:if="${erro}" th:text="${erro}"></p>
+
+    <nav class="navegacao">
+        <a class="botao" th:href="@{/agenda(data=${diaAnterior})}">&larr; Dia anterior</a>
+
+        <form class="ir-para-data" method="get" th:action="@{/agenda}">
+            <label class="oculto" for="campo-data">Escolher data</label>
+            <input id="campo-data" type="date" name="data" th:value="${dia}">
+            <button class="botao" type="submit">Ir</button>
+        </form>
+
+        <a class="botao" th:href="@{/agenda(data=${hoje})}"
+           th:classappend="${dia.equals(hoje)} ? 'ativo'">Hoje</a>
+        <a class="botao" th:href="@{/agenda(data=${diaSeguinte})}">Proximo dia &rarr;</a>
+    </nav>
+
+    <section class="resumo" th:if="${resumo.total() > 0}">
+        <div class="cartao">
+            <span class="numero" th:text="${resumo.total()}">0</span>
+            <span class="rotulo">compromissos</span>
+        </div>
+        <div class="cartao">
+            <span class="numero" th:text="${resumo.pendentes()}">0</span>
+            <span class="rotulo">pendentes</span>
+        </div>
+        <div class="cartao">
+            <span class="numero" th:text="${resumo.tempoOcupadoFormatado()}">0h</span>
+            <span class="rotulo">ocupado</span>
+        </div>
+        <div class="cartao">
+            <span class="numero" th:text="${resumo.tempoLivreFormatado()}">24h</span>
+            <span class="rotulo">livre</span>
+        </div>
+        <div class="cartao progresso">
+            <span class="numero" th:text="|${resumo.percentualConcluido()}%|">0%</span>
+            <progress th:value="${resumo.percentualConcluido()}" max="100"></progress>
+            <span class="rotulo" th:text="|${resumo.concluidos()} de ${resumo.total()} concluidos|">0 de 0</span>
+        </div>
+    </section>
+
+    <p class="vazio" th:if="${horarios.isEmpty()}">
+        Nenhum compromisso marcado para este dia. O dia inteiro esta livre.
+    </p>
+
+    <ol class="linha-do-tempo" th:unless="${horarios.isEmpty()}">
+        <li th:each="horario : ${horarios}" th:classappend="${horario.concluido} ? 'concluido'">
+
+            <div class="faixa">
+                <span class="inicio" th:text="${#temporals.format(horario.horaInicio, 'HH:mm')}">09:00</span>
+                <span class="fim" th:text="${#temporals.format(horario.horaFim, 'HH:mm')}">10:00</span>
+                <span class="duracao" th:text="${horario.duracaoFormatada}">1h</span>
+            </div>
+
+            <div class="conteudo">
+                <h2 th:text="${horario.titulo}">Titulo da tarefa</h2>
+                <p class="descricao" th:if="${horario.descricao}" th:text="${horario.descricao}"></p>
+            </div>
+
+            <div class="acoes">
+                <form method="post" th:action="@{/agenda/{id}/concluir(id=${horario.id})}">
+                    <button class="botao pequeno" type="submit"
+                            th:text="${horario.concluido} ? 'Reabrir' : 'Concluir'">Concluir</button>
+                </form>
+                <a class="botao pequeno" th:href="@{/agenda/{id}/editar(id=${horario.id})}">Editar</a>
+                <form method="post" th:action="@{/agenda/{id}/remover(id=${horario.id})}">
+                    <button class="botao pequeno perigo" type="submit">Remover</button>
+                </form>
+            </div>
+
+        </li>
+    </ol>
+
+    <footer th:replace="~{fragments/base :: rodape}"></footer>
+</main>
+</body>
+</html>

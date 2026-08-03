@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/base :: cabecalho('Compromisso')}"></head>
+<body>
+<main class="pagina estreita">
+
+    <header class="topo">
+        <div>
+            <p class="sobrescrito">Daily Planner</p>
+            <h1 th:text="${edicao} ? 'Editar compromisso' : 'Novo compromisso'">Novo compromisso</h1>
+        </div>
+    </header>
+
+    <form class="formulario" method="post" th:action="@{/agenda/salvar}" th:object="${horario}">
+        <input type="hidden" th:field="*{id}">
+
+        <div class="campo">
+            <label for="titulo">Titulo</label>
+            <input id="titulo" type="text" th:field="*{titulo}" maxlength="120"
+                   placeholder="Ex.: Estudar Spring Boot" autofocus>
+            <p class="erro" th:if="${#fields.hasErrors('titulo')}" th:errors="*{titulo}"></p>
+        </div>
+
+        <div class="campo">
+            <label for="data">Data</label>
+            <input id="data" type="date" th:field="*{data}">
+            <p class="erro" th:if="${#fields.hasErrors('data')}" th:errors="*{data}"></p>
+        </div>
+
+        <div class="linha">
+            <div class="campo">
+                <label for="horaInicio">Comeca as</label>
+                <input id="horaInicio" type="time" th:field="*{horaInicio}">
+                <p class="erro" th:if="${#fields.hasErrors('horaInicio')}" th:errors="*{horaInicio}"></p>
+            </div>
+            <div class="campo">
+                <label for="horaFim">Termina as</label>
+                <input id="horaFim" type="time" th:field="*{horaFim}">
+                <p class="erro" th:if="${#fields.hasErrors('horaFim')}" th:errors="*{horaFim}"></p>
+            </div>
+        </div>
+
+        <div class="campo">
+            <label for="descricao">Descricao <span class="opcional">(opcional)</span></label>
+            <textarea id="descricao" rows="3" th:field="*{descricao}" maxlength="500"
+                      placeholder="Detalhes, link da reuniao, o que precisa levar..."></textarea>
+            <p class="erro" th:if="${#fields.hasErrors('descricao')}" th:errors="*{descricao}"></p>
+        </div>
+
+        <label class="caixa">
+            <input type="checkbox" th:field="*{concluido}">
+            <span>Ja esta concluido</span>
+        </label>
+
+        <div class="acoes-formulario">
+            <button class="botao primario" type="submit">Salvar</button>
+            <a class="botao" th:href="@{/agenda(data=${horario.data})}">Cancelar</a>
+        </div>
+    </form>
+
+    <footer th:replace="~{fragments/base :: rodape}"></footer>
+</main>
+</body>
+</html>

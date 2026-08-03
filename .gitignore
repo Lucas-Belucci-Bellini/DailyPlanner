@@ -1,0 +1,28 @@
+# Build
+target/
+build/
+
+# Banco H2 gravado localmente
+dados/
+*.db
+*.mv.db
+*.trace.db
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+nbproject/private/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

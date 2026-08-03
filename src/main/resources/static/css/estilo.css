@@ -1,0 +1,422 @@
+/* Daily Planner - folha de estilo unica, sem framework e sem JavaScript. */
+
+:root {
+    --fundo: #f5f6f8;
+    --superficie: #ffffff;
+    --borda: #e2e5ea;
+    --texto: #1c2430;
+    --texto-fraco: #626d7d;
+    --destaque: #2f5bd7;
+    --destaque-fraco: #eaf0ff;
+    --sucesso: #1f7a4d;
+    --sucesso-fraco: #e6f5ed;
+    --falha: #b3261e;
+    --falha-fraco: #fdeceb;
+    --sombra: 0 1px 2px rgba(20, 28, 40, .06), 0 6px 20px rgba(20, 28, 40, .05);
+    --raio: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --fundo: #12151a;
+        --superficie: #1a1f27;
+        --borda: #2b323d;
+        --texto: #e8ecf2;
+        --texto-fraco: #9aa5b4;
+        --destaque: #7ea2ff;
+        --destaque-fraco: #1e2740;
+        --sucesso: #6edaa4;
+        --sucesso-fraco: #16281f;
+        --falha: #ff9b93;
+        --falha-fraco: #2c1a19;
+        --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .3);
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--fundo);
+    color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.5;
+}
+
+.pagina {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 3rem;
+}
+
+.pagina.estreita {
+    max-width: 560px;
+}
+
+/* ---------- topo ---------- */
+
+.topo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.sobrescrito {
+    margin: 0;
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--texto-fraco);
+}
+
+.topo h1 {
+    margin: .15rem 0 0;
+    font-size: 1.6rem;
+    line-height: 1.25;
+}
+
+/* ---------- navegacao entre dias ---------- */
+
+.navegacao {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.ir-para-data {
+    display: flex;
+    gap: .4rem;
+}
+
+/* ---------- botoes ---------- */
+
+.botao {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .35rem;
+    padding: .5rem .9rem;
+    border: 1px solid var(--borda);
+    border-radius: 999px;
+    background: var(--superficie);
+    color: var(--texto);
+    font: inherit;
+    font-size: .9rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color .15s, background .15s, color .15s;
+}
+
+.botao:hover {
+    border-color: var(--destaque);
+    color: var(--destaque);
+}
+
+.botao.primario {
+    background: var(--destaque);
+    border-color: var(--destaque);
+    color: #fff;
+    font-weight: 600;
+}
+
+.botao.primario:hover {
+    filter: brightness(1.08);
+    color: #fff;
+}
+
+.botao.ativo {
+    background: var(--destaque-fraco);
+    border-color: var(--destaque);
+    color: var(--destaque);
+}
+
+.botao.pequeno {
+    padding: .3rem .7rem;
+    font-size: .8rem;
+}
+
+.botao.perigo:hover {
+    border-color: var(--falha);
+    color: var(--falha);
+}
+
+.botao:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--destaque);
+    outline-offset: 2px;
+}
+
+/* ---------- avisos ---------- */
+
+.aviso {
+    margin: 0 0 1.25rem;
+    padding: .7rem 1rem;
+    border-radius: var(--raio);
+    font-size: .92rem;
+}
+
+.aviso.sucesso {
+    background: var(--sucesso-fraco);
+    color: var(--sucesso);
+}
+
+.aviso.falha {
+    background: var(--falha-fraco);
+    color: var(--falha);
+}
+
+/* ---------- resumo do dia ---------- */
+
+.resumo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: .75rem;
+    margin-bottom: 1.75rem;
+}
+
+.cartao {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+    padding: .9rem 1rem;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+}
+
+.cartao .numero {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.cartao .rotulo {
+    font-size: .75rem;
+    color: var(--texto-fraco);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.cartao.progresso {
+    grid-column: span 2;
+    justify-content: center;
+}
+
+.cartao.progresso progress {
+    width: 100%;
+    height: .4rem;
+    margin: .25rem 0 .3rem;
+    accent-color: var(--destaque);
+}
+
+/* ---------- linha do tempo ---------- */
+
+.vazio {
+    padding: 2.5rem 1rem;
+    background: var(--superficie);
+    border: 1px dashed var(--borda);
+    border-radius: var(--raio);
+    color: var(--texto-fraco);
+    text-align: center;
+}
+
+.linha-do-tempo {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.linha-do-tempo li {
+    display: grid;
+    grid-template-columns: 84px 1fr auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-left: 4px solid var(--destaque);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+}
+
+.linha-do-tempo li.concluido {
+    border-left-color: var(--sucesso);
+    opacity: .72;
+}
+
+.linha-do-tempo li.concluido .conteudo h2 {
+    text-decoration: line-through;
+}
+
+.faixa {
+    display: flex;
+    flex-direction: column;
+    font-variant-numeric: tabular-nums;
+}
+
+.faixa .inicio {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.faixa .fim {
+    font-size: .9rem;
+    color: var(--texto-fraco);
+}
+
+.faixa .duracao {
+    margin-top: .2rem;
+    font-size: .75rem;
+    color: var(--texto-fraco);
+    letter-spacing: .02em;
+}
+
+.conteudo h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.conteudo .descricao {
+    margin: .3rem 0 0;
+    font-size: .9rem;
+    color: var(--texto-fraco);
+}
+
+.acoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    justify-content: flex-end;
+}
+
+.acoes form {
+    margin: 0;
+}
+
+/* ---------- formulario ---------- */
+
+.formulario {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    padding: 1.5rem;
+    background: var(--superficie);
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+}
+
+.campo {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+}
+
+.linha {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+label {
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--texto-fraco);
+}
+
+.opcional {
+    font-weight: 400;
+    text-transform: none;
+}
+
+input[type="text"],
+input[type="date"],
+input[type="time"],
+textarea {
+    padding: .55rem .7rem;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    background: var(--fundo);
+    color: var(--texto);
+    font: inherit;
+}
+
+textarea {
+    resize: vertical;
+}
+
+.caixa {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-weight: 400;
+    color: var(--texto);
+}
+
+.erro {
+    margin: 0;
+    font-size: .82rem;
+    color: var(--falha);
+}
+
+.acoes-formulario {
+    display: flex;
+    gap: .6rem;
+}
+
+/* ---------- rodape e utilidades ---------- */
+
+.rodape {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--borda);
+    font-size: .8rem;
+    color: var(--texto-fraco);
+    text-align: center;
+}
+
+.oculto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+    .linha-do-tempo li {
+        grid-template-columns: 1fr;
+    }
+
+    .faixa {
+        flex-direction: row;
+        align-items: baseline;
+        gap: .5rem;
+    }
+
+    .acoes {
+        justify-content: flex-start;
+    }
+
+    .linha {
+        grid-template-columns: 1fr;
+    }
+
+    .cartao.progresso {
+        grid-column: span 2;
+    }
+}
