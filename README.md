@@ -12,6 +12,100 @@ e toda a logica roda em Java.
 
 ---
 
+## Radiografia do projeto
+
+O bloco abaixo é escrito por um bot que lê o código-fonte e regrava esta seção
+sozinho. Ele roda a cada push e de hora em hora, mas **só commita quando algo
+realmente mudou** — o bloco carrega uma assinatura do proprio conteudo, e
+execucao sem novidade nao gera commit. Nao edite o que esta entre os
+marcadores: a proxima execucao sobrescreve.
+
+<!-- PROJETO:START -->
+<!-- PROJETO:ASSINATURA 79beeff54ab81e87 -->
+
+> **Java 21** · **Spring Boot 3.5.5** · **10** classes Java · **1082** linhas · **7** rotas · **39** testes (todos passando)
+
+> Nenhum arquivo `.js` no projeto: as páginas são montadas no servidor com Thymeleaf e toda a lógica roda em Java.
+
+### Rotas
+
+| Método | Caminho | Controller | Método Java |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/` | RaizController | `raiz()` |
+| `GET` | `/agenda` | AgendaController | `verDia()` |
+| `GET` | `/agenda/novo` | AgendaController | `novo()` |
+| `POST` | `/agenda/salvar` | AgendaController | `salvar()` |
+| `POST` | `/agenda/{id}/concluir` | AgendaController | `alternarConclusao()` |
+| `GET` | `/agenda/{id}/editar` | AgendaController | `editar()` |
+| `POST` | `/agenda/{id}/remover` | AgendaController | `remover()` |
+
+### Dados guardados no banco
+
+**`Horario`** → tabela `horario`
+
+| Campo | Tipo | Regras |
+| :--- | :--- | :--- |
+| `id` | `Long` | chave primária |
+| `titulo` | `String` | obrigatório, não pode ser só espaço, até 120 caracteres, `NOT NULL` no banco |
+| `descricao` | `String` | até 500 caracteres |
+| `data` | `LocalDate` | obrigatório, formato ISO (`aaaa-mm-dd`), `NOT NULL` no banco |
+| `horaInicio` | `LocalTime` | obrigatório, formato `HH:mm`, `NOT NULL` no banco |
+| `horaFim` | `LocalTime` | obrigatório, formato `HH:mm`, `NOT NULL` no banco |
+| `concluido` | `boolean` | `NOT NULL` no banco |
+
+### Consultas ao banco
+
+| Interface | Método | Retorna | Origem |
+| :--- | :--- | :--- | :--- |
+| HorarioRepository | `findByDataOrderByHoraInicioAscHoraFimAsc` | `List<Horario>` | derivada do nome |
+| HorarioRepository | `findByDataBetweenOrderByDataAscHoraInicioAsc` | `List<Horario>` | derivada do nome |
+| HorarioRepository | `countByDataAndConcluidoTrue` | `long` | derivada do nome |
+| HorarioRepository | `buscarConflitos` | `List<Horario>` | `@Query` (JPQL) |
+
+### Testes
+
+✅ todos passando — **39** testes executados.
+
+> Números lidos do relatório do Surefire, ou seja, de uma execução real de `./mvnw test` — não de uma contagem no código.
+
+| Classe de teste | Testes |
+| :--- | ---: |
+| `AgendaControllerTest` | 15 |
+| `HorarioServiceTest` | 14 |
+| `HorarioTest` | 6 |
+| `DatasPtBrTest` | 3 |
+| `DailyPlannerApplicationTests` | 1 |
+
+### Tamanho do projeto
+
+| Parte | Arquivos | Linhas |
+| :--- | ---: | ---: |
+| Java (aplicação) | 10 | 621 |
+| Java (testes) | 5 | 461 |
+| Templates Thymeleaf | 4 | 199 |
+| CSS | 1 | 422 |
+| JavaScript | 0 | 0 |
+
+<details>
+<summary><b>Dependências declaradas no <code>pom.xml</code></b></summary>
+
+| Artefato | Escopo |
+| :--- | :--- |
+| `spring-boot-starter-web` | compile |
+| `spring-boot-starter-thymeleaf` | compile |
+| `spring-boot-starter-data-jpa` | compile |
+| `spring-boot-starter-validation` | compile |
+| `h2` | runtime |
+| `spring-boot-starter-test` | test |
+
+</details>
+
+<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 03/08/2026 às 20:48 UTC.</sub>
+
+<!-- PROJETO:END -->
+
+---
+
 ## Tecnologias
 
 | Camada | O que foi usado |
