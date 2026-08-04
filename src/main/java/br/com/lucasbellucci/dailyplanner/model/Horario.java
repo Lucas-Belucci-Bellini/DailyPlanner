@@ -54,6 +54,9 @@ public class Horario {
     @Column(nullable = false)
     private boolean concluido;
 
+    @Column(nullable = false)
+    private boolean notificado = false;
+
     public Horario() {
     }
 
@@ -155,6 +158,14 @@ public class Horario {
 
     public void setConcluido(boolean concluido) {
         this.concluido = concluido;
+    }
+
+    public boolean isNotificado() {
+        return notificado;
+    }
+
+    public void setNotificado(boolean notificado) {
+        this.notificado = notificado;
     }
 
     @Override

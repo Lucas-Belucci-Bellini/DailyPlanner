@@ -20,6 +20,12 @@ public interface HorarioRepository extends JpaRepository<Horario, Long> {
 
     long countByDataAndConcluidoTrue(LocalDate data);
 
+        List<Horario> findByDataAndHoraInicioBetweenAndNotificadoFalse(
+          LocalDate data,
+          LocalTime inicio,
+          LocalTime fim
+        );
+
     /**
      * Compromissos do mesmo dia que ocupam algum minuto da faixa informada.
      *
