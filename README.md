@@ -21,9 +21,9 @@ execucao sem novidade nao gera commit. Nao edite o que esta entre os
 marcadores: a proxima execucao sobrescreve.
 
 <!-- PROJETO:START -->
-<!-- PROJETO:ASSINATURA ec4e1b9961218ea8 -->
+<!-- PROJETO:ASSINATURA a2dd654e14b00c46 -->
 
-> **Java 21** · **Spring Boot 3.5.5** · **12** classes Java · **1201** linhas · **7** rotas · **39** testes
+> **Java 21** · **Spring Boot 3.5.5** · **13** classes Java · **1230** linhas · **9** rotas · **39** testes (todos passando)
 
 > ⚠️ 1 arquivo(s) `.js` no projeto — a proposta era manter tudo em Java, então vale conferir se entraram por engano.
 
@@ -38,6 +38,8 @@ marcadores: a proxima execucao sobrescreve.
 | `POST` | `/agenda/{id}/concluir` | AgendaController | `alternarConclusao()` |
 | `GET` | `/agenda/{id}/editar` | AgendaController | `editar()` |
 | `POST` | `/agenda/{id}/remover` | AgendaController | `remover()` |
+| `GET` | `/api/horarios` | HorarioRestController | `listar()` |
+| `POST` | `/api/horarios` | HorarioRestController | `criar()` |
 
 ### Dados guardados no banco
 
@@ -65,9 +67,9 @@ marcadores: a proxima execucao sobrescreve.
 
 ### Testes
 
-**39** métodos `@Test` no código.
+✅ todos passando — **39** testes executados.
 
-> Contados no código-fonte: esta execução do bot não encontrou relatório do Surefire, então o resultado (passou/falhou) não foi verificado aqui.
+> Números lidos do relatório do Surefire, ou seja, de uma execução real de `./mvnw test` — não de uma contagem no código.
 
 | Classe de teste | Testes |
 | :--- | ---: |
@@ -81,7 +83,7 @@ marcadores: a proxima execucao sobrescreve.
 
 | Parte | Arquivos | Linhas |
 | :--- | ---: | ---: |
-| Java (aplicação) | 12 | 740 |
+| Java (aplicação) | 13 | 769 |
 | Java (testes) | 5 | 461 |
 | Templates Thymeleaf | 4 | 199 |
 | CSS | 1 | 422 |
@@ -101,7 +103,7 @@ marcadores: a proxima execucao sobrescreve.
 
 </details>
 
-<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 04/08/2026 às 03:45 UTC.</sub>
+<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 04/08/2026 às 08:52 UTC.</sub>
 
 <!-- PROJETO:END -->
 
