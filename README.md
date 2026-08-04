@@ -21,11 +21,11 @@ execucao sem novidade nao gera commit. Nao edite o que esta entre os
 marcadores: a proxima execucao sobrescreve.
 
 <!-- PROJETO:START -->
-<!-- PROJETO:ASSINATURA 78b2ca050bf3fee2 -->
+<!-- PROJETO:ASSINATURA ec4e1b9961218ea8 -->
 
-> **Java 21** · **Spring Boot 3.5.5** · **10** classes Java · **1082** linhas · **7** rotas · **39** testes
+> **Java 21** · **Spring Boot 3.5.5** · **12** classes Java · **1201** linhas · **7** rotas · **39** testes
 
-> Nenhum arquivo `.js` no projeto: as páginas são montadas no servidor com Thymeleaf e toda a lógica roda em Java.
+> ⚠️ 1 arquivo(s) `.js` no projeto — a proposta era manter tudo em Java, então vale conferir se entraram por engano.
 
 ### Rotas
 
@@ -60,6 +60,7 @@ marcadores: a proxima execucao sobrescreve.
 | HorarioRepository | `findByDataOrderByHoraInicioAscHoraFimAsc` | `List<Horario>` | derivada do nome |
 | HorarioRepository | `findByDataBetweenOrderByDataAscHoraInicioAsc` | `List<Horario>` | derivada do nome |
 | HorarioRepository | `countByDataAndConcluidoTrue` | `long` | derivada do nome |
+| HorarioRepository | `findByDataAndHoraInicioBetweenAndNotificadoFalse` | `List<Horario>` | derivada do nome |
 | HorarioRepository | `buscarConflitos` | `List<Horario>` | `@Query` (JPQL) |
 
 ### Testes
@@ -80,11 +81,11 @@ marcadores: a proxima execucao sobrescreve.
 
 | Parte | Arquivos | Linhas |
 | :--- | ---: | ---: |
-| Java (aplicação) | 10 | 621 |
+| Java (aplicação) | 12 | 740 |
 | Java (testes) | 5 | 461 |
 | Templates Thymeleaf | 4 | 199 |
 | CSS | 1 | 422 |
-| JavaScript | 0 | 0 |
+| JavaScript | 1 | 0 |
 
 <details>
 <summary><b>Dependências declaradas no <code>pom.xml</code></b></summary>
@@ -100,7 +101,7 @@ marcadores: a proxima execucao sobrescreve.
 
 </details>
 
-<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 03/08/2026 às 22:47 UTC.</sub>
+<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 04/08/2026 às 03:45 UTC.</sub>
 
 <!-- PROJETO:END -->
 
