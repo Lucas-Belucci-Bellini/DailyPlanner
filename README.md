@@ -21,9 +21,9 @@ execucao sem novidade nao gera commit. Nao edite o que esta entre os
 marcadores: a proxima execucao sobrescreve.
 
 <!-- PROJETO:START -->
-<!-- PROJETO:ASSINATURA a2dd654e14b00c46 -->
+<!-- PROJETO:ASSINATURA f475359f50b0665a -->
 
-> **Java 21** · **Spring Boot 3.5.5** · **13** classes Java · **1230** linhas · **9** rotas · **39** testes (todos passando)
+> **Java 17** · **Spring Boot 3.5.5** · **13** classes Java · **1230** linhas · **9** rotas · **39** testes (todos passando)
 
 > ⚠️ 1 arquivo(s) `.js` no projeto — a proposta era manter tudo em Java, então vale conferir se entraram por engano.
 
@@ -103,7 +103,7 @@ marcadores: a proxima execucao sobrescreve.
 
 </details>
 
-<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 04/08/2026 às 08:52 UTC.</sub>
+<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 04/08/2026 às 09:04 UTC.</sub>
 
 <!-- PROJETO:END -->
 
