@@ -37,8 +37,15 @@ jobs:
           distribution: temurin
           cache: maven
 
+      # O chmod antes da chamada não é decoração: commit gravado pela interface
+      # web do GitHub cria o arquivo como 100644, o wrapper perde o bit de
+      # executável e o job morre em "./mvnw: Permission denied" (exit 126) sem
+      # nem chegar a compilar. Já aconteceu uma vez no main. Garantir aqui custa
+      # nada e evita bateria vermelha por detalhe de permissão.
       - name: Compilar e testar
-        run: ./mvnw -B --no-transfer-progress verify
+        run: |
+          chmod +x mvnw
+          ./mvnw -B --no-transfer-progress verify
 
       # O relatório fica disponível mesmo quando a bateria falha — é justamente
       # aí que alguém precisa abrir para ver qual teste quebrou.
