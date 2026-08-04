@@ -1,3 +1,18 @@
+# Java
+/target
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/package-lock.json
+
+# Local data
+/dados/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
 # Build
 target/
 build/
