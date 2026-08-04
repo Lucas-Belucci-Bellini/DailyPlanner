@@ -2,7 +2,7 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 async function carregarTarefas(){
   try{
-    const res = await fetch(`${API}/horarios`);
+    const res = await fetch(`${API}/api/horarios`);
     const tarefas = await res.json();
     const div = document.getElementById('listaTarefas');
     div.innerHTML = '';
@@ -30,10 +30,10 @@ document.getElementById('formHorario').addEventListener('submit', async (ev)=>{
     horaFim: document.getElementById('horaFim').value ? document.getElementById('horaFim').value + ':00' : null
   };
   try{
-    const res = await fetch(`${API}/agenda/salvar`, {
+    const res = await fetch(`${API}/api/horarios`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(novo)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(novo)
     });
     if(res.ok){
       alert('Tarefa salva!');
