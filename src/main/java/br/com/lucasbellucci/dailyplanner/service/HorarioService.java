@@ -106,7 +106,7 @@ public class HorarioService {
         if (conflitos.isEmpty()) {
             return;
         }
-        Horario primeiro = conflitos.getFirst();
+        Horario primeiro = conflitos.get(0);
         throw new HorarioInvalidoException("horaInicio",
                 "Esse intervalo ja esta ocupado por \"%s\" (%s as %s)"
                         .formatted(primeiro.getTitulo(), primeiro.getHoraInicio(), primeiro.getHoraFim()));

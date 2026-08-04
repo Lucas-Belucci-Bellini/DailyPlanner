@@ -18,7 +18,7 @@
     <description>Organizador de horarios do dia a dia, escrito em Java com Spring Boot</description>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
