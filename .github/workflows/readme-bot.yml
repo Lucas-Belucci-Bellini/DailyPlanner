@@ -59,9 +59,15 @@ jobs:
       # README — e o bloco vai dizer quantos testes quebraram, que é uma
       # informação melhor do que um README parado no tempo. Quem falha alto é o
       # workflow de Testes, não este.
+      # Mesmo chmod do workflow de Testes: sem ele, um commit feito pela
+      # interface web derruba esta etapa com "Permission denied", e o bloco do
+      # README cai para a contagem estática de @Test — honesta, mas pior do que
+      # o número verificado que o Surefire daria.
       - name: Rodar os testes (alimenta os números do README)
         continue-on-error: true
-        run: ./mvnw -B --no-transfer-progress test
+        run: |
+          chmod +x mvnw
+          ./mvnw -B --no-transfer-progress test
 
       - name: Analisar o projeto e reescrever o bloco
         run: python3 .github/scripts/readme_stats.py
