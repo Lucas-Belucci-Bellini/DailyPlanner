@@ -1,240 +1,217 @@
 # Daily Planner
 
-Organizador de horarios do dia a dia, escrito em **Java 21 com Spring Boot**.
+Agenda de horários do dia a dia, escrita em **Next.js com TypeScript** e publicada na
+**Vercel**.
 
-Voce escolhe um dia, marca seus compromissos com hora de inicio e fim, e o sistema cuida do
-resto: guarda tudo em banco, mostra a agenda em ordem, calcula quanto tempo do dia esta
-ocupado e **recusa dois compromissos no mesmo horario**.
+Você escolhe um dia, marca seus compromissos com hora de início e fim, e o sistema cuida do
+resto: guarda tudo em Postgres, mostra a agenda em ordem, calcula quanto tempo do dia está
+ocupado e **recusa dois compromissos no mesmo minuto**.
 
-As paginas sao montadas no servidor com Thymeleaf. Nao ha JavaScript no projeto: a navegacao
-entre dias, os formularios e os botoes de concluir/remover sao links e `<form>` HTML comuns,
-e toda a logica roda em Java.
+As páginas são montadas no servidor pelo App Router e a gravação passa por Server Actions —
+não há API separada para manter, e o navegador recebe HTML pronto.
+
+O cronograma da disciplina está em [CRONOGRAMA.md](./CRONOGRAMA.md).
 
 ---
 
 ## Radiografia do projeto
 
-O bloco abaixo é escrito por um bot que lê o código-fonte e regrava esta seção
-sozinho. Ele roda a cada push e de hora em hora, mas **só commita quando algo
-realmente mudou** — o bloco carrega uma assinatura do proprio conteudo, e
-execucao sem novidade nao gera commit. Nao edite o que esta entre os
-marcadores: a proxima execucao sobrescreve.
+O bloco abaixo é escrito por um bot que lê o código-fonte e regrava esta seção sozinho. Ele
+roda a cada push e uma vez por dia, mas **só commita quando algo realmente mudou** — o bloco
+carrega uma assinatura do próprio conteúdo, e execução sem novidade não gera commit. Não
+edite o que está entre os marcadores: a próxima execução sobrescreve.
 
 <!-- PROJETO:START -->
-<!-- PROJETO:ASSINATURA f475359f50b0665a -->
+<!-- ASSINATURA a6a844f9fbefcdcb -->
 
-> **Java 17** · **Spring Boot 3.5.5** · **13** classes Java · **1230** linhas · **9** rotas · **39** testes (todos passando)
+> **Next.js 15.5.23** · **TypeScript 5.9.3** · **Postgres + Drizzle** · **4** rotas · **828** linhas · **27** testes (todos passando)
 
-> ⚠️ 1 arquivo(s) `.js` no projeto — a proposta era manter tudo em Java, então vale conferir se entraram por engano.
+> Roda inteiro na Vercel: paginas montadas no servidor pelo App Router e gravacao por Server Actions, sem API separada para manter.
 
 ### Rotas
 
-| Método | Caminho | Controller | Método Java |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/` | RaizController | `raiz()` |
-| `GET` | `/agenda` | AgendaController | `verDia()` |
-| `GET` | `/agenda/novo` | AgendaController | `novo()` |
-| `POST` | `/agenda/salvar` | AgendaController | `salvar()` |
-| `POST` | `/agenda/{id}/concluir` | AgendaController | `alternarConclusao()` |
-| `GET` | `/agenda/{id}/editar` | AgendaController | `editar()` |
-| `POST` | `/agenda/{id}/remover` | AgendaController | `remover()` |
-| `GET` | `/api/horarios` | HorarioRestController | `listar()` |
-| `POST` | `/api/horarios` | HorarioRestController | `criar()` |
+| Caminho | Arquivo | Renderizacao |
+| :--- | :--- | :--- |
+| `/` | `app/page.tsx` | estatica |
+| `/agenda` | `app/agenda/page.tsx` | sob demanda (dados vivos) |
+| `/agenda/[id]/editar` | `app/agenda/[id]/editar/page.tsx` | sob demanda (dados vivos) |
+| `/agenda/novo` | `app/agenda/novo/page.tsx` | estatica |
+
+### Gravacao (Server Actions)
+
+Toda escrita passa por estas funcoes, que rodam no servidor:
+
+- `salvarHorario()`
+- `alternarConclusao()`
+- `removerHorario()`
 
 ### Dados guardados no banco
 
-**`Horario`** → tabela `horario`
+Tabela `horarios`
 
-| Campo | Tipo | Regras |
-| :--- | :--- | :--- |
-| `id` | `Long` | chave primária |
-| `titulo` | `String` | obrigatório, não pode ser só espaço, até 120 caracteres, `NOT NULL` no banco |
-| `descricao` | `String` | até 500 caracteres |
-| `data` | `LocalDate` | obrigatório, formato ISO (`aaaa-mm-dd`), `NOT NULL` no banco |
-| `horaInicio` | `LocalTime` | obrigatório, formato `HH:mm`, `NOT NULL` no banco |
-| `horaFim` | `LocalTime` | obrigatório, formato `HH:mm`, `NOT NULL` no banco |
-| `concluido` | `boolean` | `NOT NULL` no banco |
-
-### Consultas ao banco
-
-| Interface | Método | Retorna | Origem |
+| Campo | Coluna | Tipo | Regras |
 | :--- | :--- | :--- | :--- |
-| HorarioRepository | `findByDataOrderByHoraInicioAscHoraFimAsc` | `List<Horario>` | derivada do nome |
-| HorarioRepository | `findByDataBetweenOrderByDataAscHoraInicioAsc` | `List<Horario>` | derivada do nome |
-| HorarioRepository | `countByDataAndConcluidoTrue` | `long` | derivada do nome |
-| HorarioRepository | `findByDataAndHoraInicioBetweenAndNotificadoFalse` | `List<Horario>` | derivada do nome |
-| HorarioRepository | `buscarConflitos` | `List<Horario>` | `@Query` (JPQL) |
+| `id` | `id` | `serial` | chave primaria |
+| `titulo` | `titulo` | `varchar` | obrigatorio (`NOT NULL`), ate 120 caracteres |
+| `descricao` | `descricao` | `varchar` | ate 500 caracteres |
+| `data` | `data` | `date` | obrigatorio (`NOT NULL`) |
+| `horaInicio` | `hora_inicio` | `time` | obrigatorio (`NOT NULL`) |
+| `horaFim` | `hora_fim` | `time` | obrigatorio (`NOT NULL`) |
+| `concluido` | `concluido` | `boolean` | obrigatorio (`NOT NULL`), padrao `false` |
+
+### Regras da agenda
+
+Funcoes puras em `lib/agenda.ts` — sem banco e sem React, por isso testadas de verdade:
+
+  `emMinutos()`, `horaValida()`, `dataValida()`, `duracaoEmMinutos()`, `formatarDuracao()`, `conflita()`, `validarCampos()`, `temErro()`, `acharConflito()`, `mensagemDeConflito()`, `resumoDoDia()`, `ordenarPorHorario()`
 
 ### Testes
 
-✅ todos passando — **39** testes executados.
+✅ todos passando — **27** testes em 2 arquivo(s).
 
-> Números lidos do relatório do Surefire, ou seja, de uma execução real de `./mvnw test` — não de uma contagem no código.
+> Numeros lidos do relatorio do Vitest, ou seja, de uma execucao real de `npm test` — nao de uma contagem no codigo.
 
-| Classe de teste | Testes |
+| Arquivo de teste | Testes |
 | :--- | ---: |
-| `AgendaControllerTest` | 15 |
-| `HorarioServiceTest` | 14 |
-| `HorarioTest` | 6 |
-| `DatasPtBrTest` | 3 |
-| `DailyPlannerApplicationTests` | 1 |
+| `agenda.test.ts` | 20 |
+| `datas.test.ts` | 7 |
 
 ### Tamanho do projeto
 
 | Parte | Arquivos | Linhas |
 | :--- | ---: | ---: |
-| Java (aplicação) | 13 | 769 |
-| Java (testes) | 5 | 461 |
-| Templates Thymeleaf | 4 | 199 |
+| Telas e actions (`app/`) | 7 | 415 |
+| Regras e banco (`lib/`) | 5 | 413 |
+| Testes (`tests/`) | 2 | 224 |
 | CSS | 1 | 422 |
-| JavaScript | 1 | 0 |
 
 <details>
-<summary><b>Dependências declaradas no <code>pom.xml</code></b></summary>
+<summary><b>Dependencias declaradas no <code>package.json</code></b></summary>
 
-| Artefato | Escopo |
-| :--- | :--- |
-| `spring-boot-starter-web` | compile |
-| `spring-boot-starter-thymeleaf` | compile |
-| `spring-boot-starter-data-jpa` | compile |
-| `spring-boot-starter-validation` | compile |
-| `h2` | runtime |
-| `spring-boot-starter-test` | test |
+| Pacote | Versao | Uso |
+| :--- | :--- | :--- |
+| `drizzle-orm` | `^0.45.2` | producao |
+| `next` | `^15.5.23` | producao |
+| `postgres` | `^3.4.9` | producao |
+| `react` | `^19.0.0` | producao |
+| `react-dom` | `^19.0.0` | producao |
+| `@types/node` | `^22.10.0` | desenvolvimento |
+| `@types/react` | `^19.0.0` | desenvolvimento |
+| `@types/react-dom` | `^19.0.0` | desenvolvimento |
+| `drizzle-kit` | `^0.31.10` | desenvolvimento |
+| `typescript` | `^5.9.3` | desenvolvimento |
+| `vitest` | `^4.1.10` | desenvolvimento |
 
 </details>
 
-<sub>Radiografia gerada automaticamente a partir do código-fonte. Última mudança detectada em 04/08/2026 às 09:04 UTC.</sub>
+<sub>Bloco escrito automaticamente pelo bot. Ultima mudanca detectada em 08/08/2026 as 23:09 UTC.</sub>
 
 <!-- PROJETO:END -->
 
 ---
 
-## Tecnologias
-
-| Camada | O que foi usado |
-| --- | --- |
-| Linguagem | Java 21 |
-| Framework | Spring Boot 3.5 |
-| Web | Spring MVC + Thymeleaf (HTML gerado no servidor) |
-| Banco | Spring Data JPA / Hibernate + H2 |
-| Validacao | Jakarta Bean Validation |
-| Build | Maven (com wrapper `./mvnw`) |
-| Testes | JUnit 5, AssertJ, MockMvc |
-
 ## Como rodar
 
-Precisa apenas do **JDK 21** instalado. O Maven vem junto no wrapper.
+Precisa do **Node 20 ou mais novo** e de um **Postgres**.
 
 ```bash
 git clone https://github.com/Lucas-Belucci-Bellini/DailyPlanner.git
 cd DailyPlanner
-./mvnw spring-boot:run
+npm install
+
+cp .env.example .env.local     # aponte POSTGRES_URL para o seu banco
+npm run db:push                # cria a tabela
+npm run dev
 ```
 
-No Windows, troque `./mvnw` por `mvnw.cmd`.
+Depois abra **<http://localhost:3000>**.
 
-Depois abra **<http://localhost:8080>** no navegador.
-
-Os dados ficam num arquivo H2 dentro da pasta `dados/`, entao a agenda continua la na proxima
-vez que voce subir a aplicacao. Para comecar do zero, apague a pasta `dados/`.
-
-### Rodar os testes
+### Testes
 
 ```bash
-./mvnw test
+npm test
 ```
 
-### Gerar o `.jar` para publicar
+A bateria cobre as regras da agenda em `lib/`, que são funções puras: rodam em
+milissegundos e **não precisam de banco no ar**.
+
+### Build de produção
 
 ```bash
-./mvnw clean package
-java -jar target/dailyplanner-0.0.1-SNAPSHOT.jar
+npm run build
+npm start
 ```
 
-### Espiar o banco pelo navegador
+## Publicar na Vercel
 
-O console do H2 vem desligado. Para liga-lo:
+1. Importe o repositório em <https://vercel.com/new>.
+2. Em **Storage → Create Database → Postgres**, crie o banco. A Vercel injeta a variável
+   `POSTGRES_URL` no projeto sozinha.
+3. Rode `npm run db:push` uma vez apontando para esse banco, para criar a tabela.
+4. Cada push na `main` publica sozinho.
 
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.arguments=--spring.h2.console.enabled=true
-```
+Nenhum passo extra de configuração: o projeto é Next.js puro, que é o formato que a
+plataforma executa nativamente.
 
-Acesse <http://localhost:8080/h2-console> e informe a URL `jdbc:h2:file:./dados/dailyplanner`,
-usuario `sa`, senha em branco.
+## O que dá para fazer
 
-## O que da para fazer
-
-- Navegar entre os dias (dia anterior, proximo dia, ir para uma data, voltar para hoje)
-- Adicionar um compromisso com titulo, data, horario de inicio e fim e uma descricao opcional
+- Navegar entre os dias (dia anterior, próximo dia, ir para uma data, voltar para hoje)
+- Adicionar um compromisso com título, data, horário de início e fim e descrição opcional
 - Editar e remover compromissos
-- Marcar como concluido e reabrir
-- Ver o resumo do dia: total, pendentes, tempo ocupado, tempo livre e percentual concluido
+- Marcar como concluído e reabrir
+- Ver o resumo do dia: total, pendentes, tempo ocupado, tempo livre e percentual concluído
 
 ### Regras que o sistema garante
 
-- O titulo e obrigatorio (ate 120 caracteres) e a descricao vai ate 500
-- O termino precisa ser **depois** do inicio
-- Dois compromissos **nao podem disputar o mesmo minuto** do mesmo dia. O erro aparece no
-  formulario dizendo qual compromisso ja ocupa aquele intervalo
-- Encostar um no outro e permitido: 09:00-10:00 e 10:00-11:00 convivem numa boa
-- O mesmo horario em dias diferentes tambem e permitido
+- O título é obrigatório (até 120 caracteres) e a descrição vai até 500
+- O término precisa ser **depois** do início
+- Dois compromissos **não podem disputar o mesmo minuto** do mesmo dia. O erro aparece no
+  formulário dizendo qual compromisso já ocupa aquele intervalo, e o que você digitou
+  continua lá
+- Encostar um no outro é permitido: 09:00-10:00 e 10:00-11:00 convivem numa boa
+- O mesmo horário em dias diferentes também é permitido
 
-## Como o codigo esta organizado
+## Como o código está organizado
 
 ```
-src/main/java/br/com/lucasbellucci/dailyplanner/
-├── DailyPlannerApplication.java     ponto de entrada
-├── model/Horario.java               a entidade: vira a tabela "horario" no banco
-├── repository/HorarioRepository.java consultas (o Spring Data implementa sozinho)
-├── service/
-│   ├── HorarioService.java          as regras da agenda; toda gravacao passa por aqui
-│   ├── ResumoDoDia.java             os numeros do cabecalho
-│   └── ...Exception.java            erros de negocio
-└── web/
-    ├── AgendaController.java        as rotas das telas
-    ├── RaizController.java          "/" leva para a agenda de hoje
-    └── DatasPtBr.java               datas escritas em portugues
+app/
+├── page.tsx                    "/" leva para a agenda de hoje
+├── actions.ts                  Server Actions: toda gravação passa por aqui
+├── globals.css                 estilo único, sem framework
+└── agenda/
+    ├── page.tsx                a agenda do dia
+    ├── FormularioHorario.tsx   o formulário de criar e editar
+    ├── novo/page.tsx           criar
+    └── [id]/editar/page.tsx    editar
 
-src/main/resources/
-├── application.properties           banco, locale e porta
-├── static/css/estilo.css            estilo unico, sem framework
-└── templates/
-    ├── fragments/base.html          pedacos reaproveitados (head, rodape)
-    ├── agenda/dia.html              a agenda do dia
-    ├── agenda/formulario.html       criar e editar
-    └── error.html                   pagina de erro
+lib/
+├── agenda.ts                   as regras: conflito, duração, validação, resumo
+├── datas.ts                    datas escritas em português
+├── repositorio.ts              acesso ao banco (sem regra de negócio)
+└── db/
+    ├── schema.ts               a tabela, em Drizzle
+    └── index.ts                conexão preguiçosa com o Postgres
+
+tests/                          as regras testadas sem banco
 ```
 
-O caminho de uma requisicao e sempre o mesmo: **Controller** recebe, **Service** aplica as
-regras, **Repository** fala com o banco, e o **Thymeleaf** devolve o HTML pronto.
+O caminho de uma gravação é sempre o mesmo: **Server Action** recebe o formulário,
+**`lib/agenda.ts`** aplica as regras, **`lib/repositorio.ts`** fala com o banco, e a página
+é remontada no servidor.
 
-As regras ficam no service, e nao no controller, de proposito: assim elas continuam valendo
-se um dia o projeto ganhar uma API REST ou uma tela nova.
+As regras ficam em funções puras, e não dentro das telas, de propósito: é o que permite
+testá-las de verdade, sem subir Postgres nem renderizar React.
 
-## Testes
+### Por que os horários são texto
 
-`./mvnw test` roda 39 testes em quatro niveis:
+Horas viajam como `"HH:mm"` e datas como `"aaaa-mm-dd"`, do formulário até o banco. É o
+formato que `<input type="time">` e `<input type="date">` mandam e leem, e as colunas são
+`time` e `date` sem fuso. Um compromisso das 09:00 é as 09:00 de quem marcou — guardar como
+instante com fuso faria o horário andar sozinho conforme a região do servidor.
 
-- `HorarioTest` - calculo de duracao e deteccao de sobreposicao, sem Spring
-- `DatasPtBrTest` - datas por extenso em portugues
-- `HorarioServiceTest` - as regras da agenda contra um banco H2 de verdade (`@DataJpaTest`)
-- `AgendaControllerTest` - as telas de ponta a ponta com MockMvc, incluindo o HTML renderizado
-- `DailyPlannerApplicationTests` - a aplicacao sobe inteira
+## Próximos passos
 
-## Publicar na internet
-
-O GitHub guarda o codigo, mas nao roda Java nem banco de dados (o GitHub Pages so serve
-sites estaticos). Para colocar no ar, gere o `.jar` com `./mvnw clean package` e suba em um
-servico de nuvem como **Railway** ou **Render**, trocando o H2 por um **PostgreSQL**.
-
-A troca de banco mexe em dois lugares apenas: a dependencia no `pom.xml` e a
-`spring.datasource.url` no `application.properties`. O resto do codigo continua igual, porque
-quem conversa com o banco e o JPA.
-
-## Proximos passos
-
-- Visao de semana e de mes (o `HorarioService.listarPorPeriodo` ja existe para isso)
+- Visão de semana e de mês (`listarPorPeriodo` já existe para isso)
 - Categorias e cores por tipo de compromisso
 - Compromissos que se repetem toda semana
 - Login, para a agenda ser de cada pessoa
-- API REST, para um app de celular consumir a mesma base
