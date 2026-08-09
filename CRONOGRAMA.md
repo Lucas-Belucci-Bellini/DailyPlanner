@@ -43,12 +43,13 @@ O bloco abaixo é escrito pelo bot a partir do histórico do git, e só é
 reescrito quando há commit novo. Não edite: a próxima execução sobrescreve.
 
 <!-- CRONOGRAMA:START -->
-<!-- ASSINATURA 5f2edad9f001cc09 -->
+<!-- ASSINATURA fb1133770c705466 -->
 
-> **10** commits · **2** dias de trabalho · de 03/08/2026 a 04/08/2026
+> **13** commits · **3** dias de trabalho · de 03/08/2026 a 08/08/2026
 
 | Data | Commits | O que foi feito |
 | :--- | ---: | :--- |
+| **08/08/2026** | 3 | `d38e699` Declara o framework para a Vercel, que ainda achava que era site estatico<br>`b066b37` Cria o CRONOGRAMA.md e poe o bot para manter os dois documentos<br>`c50049f` Refaz o projeto em Next.js para rodar na Vercel |
 | **04/08/2026** | 7 | `9b9809f` chore: ajusta build Java 17 e frontend Vite<br>`4f0bcbe` ci: deploy frontend to gh-pages<br>`7705008` chore: add .gitignore<br>`0909716` chore: remove committed node_modules and dist and add .gitignore<br>`d54ea84` CI: deploy frontend/dist to GitHub Pages on push to main<br>`a0c691f` BRAVO<br>`105bf43` vite |
 | **03/08/2026** | 3 | `c69a8eb` atualização forçada<br>`1c67393` atulização força no main<br>`e49ca36` Inicia o repositorio |
 
@@ -57,8 +58,8 @@ reescrito quando há commit novo. Não edite: a próxima execução sobrescreve.
 | Autor | Commits |
 | :--- | ---: |
 | Lucas Belucci Bellini | 9 |
-| Claude | 1 |
+| Claude | 4 |
 
-<sub>Bloco escrito automaticamente pelo bot. Ultima mudanca detectada em 08/08/2026 as 23:08 UTC.</sub>
+<sub>Bloco escrito automaticamente pelo bot. Ultima mudanca detectada em 09/08/2026 as 04:10 UTC.</sub>
 
 <!-- CRONOGRAMA:END -->
