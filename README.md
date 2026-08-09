@@ -177,6 +177,7 @@ plataforma executa nativamente.
 app/
 ├── page.tsx                    "/" leva para a agenda de hoje
 ├── actions.ts                  Server Actions: toda gravação passa por aqui
+├── ConfiguracaoPendente.tsx    tela mostrada quando ainda falta o banco
 ├── globals.css                 estilo único, sem framework
 └── agenda/
     ├── page.tsx                a agenda do dia

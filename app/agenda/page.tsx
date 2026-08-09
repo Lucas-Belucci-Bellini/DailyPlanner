@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { alternarConclusao, removerHorario } from '@/app/actions';
 import { formatarDuracao, duracaoEmMinutos, resumoDoDia } from '@/lib/agenda';
 import { hojeISO, porExtenso, somarDias } from '@/lib/datas';
+import ConfiguracaoPendente from '@/app/ConfiguracaoPendente';
+import { bancoConfigurado } from '@/lib/db';
 import { listarPorDia } from '@/lib/repositorio';
 
 // A agenda muda a cada gravacao, entao a pagina e sempre montada na hora.
@@ -11,6 +13,8 @@ export const dynamic = 'force-dynamic';
 type Props = { searchParams: Promise<{ data?: string }> };
 
 export default async function AgendaDoDia({ searchParams }: Props) {
+  if (!bancoConfigurado()) return <ConfiguracaoPendente />;
+
   const { data } = await searchParams;
   const hoje = hojeISO();
   const dia = data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : hoje;

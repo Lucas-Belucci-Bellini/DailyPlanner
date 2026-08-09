@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 
 import FormularioHorario from '@/app/agenda/FormularioHorario';
+import ConfiguracaoPendente from '@/app/ConfiguracaoPendente';
+import { bancoConfigurado } from '@/lib/db';
 import { buscarPorId } from '@/lib/repositorio';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +10,8 @@ export const dynamic = 'force-dynamic';
 type Props = { params: Promise<{ id: string }> };
 
 export default async function EditarHorario({ params }: Props) {
+  if (!bancoConfigurado()) return <ConfiguracaoPendente />;
+
   const { id } = await params;
   const numero = Number(id);
   if (!Number.isInteger(numero)) notFound();

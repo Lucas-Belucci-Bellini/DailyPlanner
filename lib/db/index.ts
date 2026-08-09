@@ -18,6 +18,18 @@ type Banco = ReturnType<typeof drizzle<typeof schema>>;
  * processo novo, e um pool grande por processo esgota o limite de conexoes do
  * banco assim que chega trafego.
  */
+/**
+ * Ha banco configurado?
+ *
+ * As telas perguntam isso ANTES de consultar. Sem essa checagem, a falta da
+ * variavel vira uma excecao no meio da renderizacao e o visitante recebe a
+ * pagina de erro 500 do Next, que nao diz nada a quem esta so olhando o site.
+ * Com ela, a aplicacao explica o que falta configurar.
+ */
+export function bancoConfigurado(): boolean {
+  return Boolean(process.env.POSTGRES_URL ?? process.env.DATABASE_URL);
+}
+
 function urlDoBanco(): string {
   const url = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;
   if (!url) {
