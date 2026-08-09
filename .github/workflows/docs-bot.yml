@@ -1,0 +1,95 @@
+name: Documentação (bot)
+
+# Mantém em dia a "Radiografia do projeto" no README e o "Andamento" no
+# CRONOGRAMA.md — este último exigido pela disciplina, com o nome em caixa alta.
+#
+# O bot roda a bateria antes de analisar o projeto, e não só para saber se está
+# verde: é assim que a contagem de testes no README vem de uma execução real,
+# lida do relatório do Vitest, em vez de um número contado no código-fonte que
+# ninguém verificou.
+#
+# **Commit só quando há dado novo.** Cada bloco carrega uma assinatura SHA-256
+# do próprio conteúdo, calculada sem a data. Se nada mudou, a assinatura bate, o
+# script não escreve nada e o passo de commit não encontra diferença — por isso
+# o agendamento diário não enche o histórico de commits vazios.
+
+on:
+  push:
+    branches: [main]
+    # Os .md ficam de fora: o commit do próprio bot mexe só neles, e listá-los
+    # aqui faria o bot se acordar sozinho em looping.
+    paths:
+      - "app/**"
+      - "lib/**"
+      - "tests/**"
+      - "package.json"
+      - ".github/scripts/atualiza_docs.py"
+      - ".github/workflows/docs-bot.yml"
+  schedule:
+    # Rede de segurança diária, para o caso de um push ter escapado do filtro
+    # acima. Agendamento sempre roda no branch padrão do repositório.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+# Duas execuções nunca reescrevem os mesmos arquivos ao mesmo tempo.
+concurrency:
+  group: docs-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  documentar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # O cronograma é montado a partir do histórico do git; com o clone
+          # raso padrão, o bot só enxergaria o último commit e a linha do tempo
+          # teria um dia só.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # continue-on-error: com a bateria vermelha o bot ainda deve atualizar a
+      # documentação — e o bloco vai dizer quantos testes quebraram, que é uma
+      # informação melhor do que um README parado no tempo. Quem falha alto é o
+      # workflow de Testes, não este.
+      - name: Rodar os testes (alimenta os números do README)
+        continue-on-error: true
+        run: npx vitest run --reporter=json --outputFile=relatorio-testes.json
+
+      - name: Analisar o projeto e reescrever os blocos
+        run: python3 .github/scripts/atualiza_docs.py
+
+      - name: Commitar se houver dado novo
+        run: |
+          rm -f relatorio-testes.json
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md CRONOGRAMA.md
+          if git diff --cached --quiet; then
+            echo "Nada mudou no projeto — sem commit."
+            exit 0
+          fi
+          git commit -m "chore(bot): atualiza README e CRONOGRAMA [skip ci]"
+          for i in 1 2 3 4; do
+            if git push; then exit 0; fi
+            echo "push falhou; refazendo em cima do remoto (tentativa $i)"
+            git pull --rebase --autostash origin main || true
+            sleep $((2 ** i))
+          done
+          echo "::error::não consegui enviar o commit após 4 tentativas"
+          exit 1

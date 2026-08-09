@@ -1,43 +1,31 @@
-# Java
-/target
+# Dependências
+node_modules/
 
-# Node
-frontend/node_modules/
-frontend/dist/
-frontend/package-lock.json
-
-# Local data
-/dados/
-
-# IDE
-.idea/
-.vscode/
-.DS_Store
-# Build
-target/
+# Build do Next
+.next/
+out/
 build/
 
-# Banco H2 gravado localmente
-dados/
-*.db
-*.mv.db
-*.trace.db
+# Ambiente: nunca versionar credencial de banco
+.env
+.env.local
+.env*.local
 
-# IDEs
-.idea/
-*.iml
-*.ipr
-*.iws
-.vscode/
-.classpath
-.project
-.settings/
-bin/
-nbproject/private/
+# Relatório gerado pelo bot durante a execução
+relatorio-testes.json
 
-# Sistema operacional
+# Migrações geradas pelo drizzle-kit ficam versionadas; o cache dele, não
+.drizzle/
+
+# Sistema operacional e editores
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
 
 # Logs
 *.log
+
+# TypeScript: gerados pelo Next a cada build, nao sao fonte
+next-env.d.ts
+*.tsbuildinfo

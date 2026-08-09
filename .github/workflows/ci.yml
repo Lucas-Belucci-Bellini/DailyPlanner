@@ -1,13 +1,12 @@
 name: Testes
 
-# Roda a bateria de testes a cada push e em toda pull request. É este o check
-# verde que significa alguma coisa no projeto: ele compila o Java e executa os
-# testes de verdade.
+# Roda a bateria e o build a cada push e em toda pull request. É este o check
+# verde que significa alguma coisa no projeto.
 
 on:
   # Só `main` no gatilho de push. Um branch com pull request aberta já é coberto
-  # pelo gatilho `pull_request`; listar "**" aqui fazia os dois dispararem e a
-  # PR aparecia com dois checks "testar" idênticos rodando lado a lado.
+  # pelo gatilho `pull_request`; listar "**" aqui faria os dois dispararem e a
+  # PR apareceria com dois checks idênticos rodando lado a lado.
   push:
     branches: [main]
     paths-ignore:
@@ -15,7 +14,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Push novo na mesma PR cancela a execução anterior, que já ficou obsoleta.
+# Push novo na mesma referência cancela a execução anterior, que já ficou obsoleta.
 concurrency:
   group: testes-${{ github.ref }}
   cancel-in-progress: true
@@ -26,27 +25,24 @@ permissions:
 jobs:
   testar:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Preparar o JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-node@v4
         with:
-          java-version: "17"
-          distribution: temurin
-          cache: maven
+          node-version: "22"
+          cache: npm
 
-      - name: Compilar e testar
-        run: ./mvnw -B --no-transfer-progress verify
+      - name: Instalar dependências
+        run: npm ci
 
-      # O relatório fica disponível mesmo quando a bateria falha — é justamente
-      # aí que alguém precisa abrir para ver qual teste quebrou.
-      - name: Guardar o relatório dos testes
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: relatorio-surefire
-          path: target/surefire-reports/
-          if-no-files-found: ignore
-          retention-days: 14
+      - name: Rodar os testes
+        run: npm test
+
+      # O build entra na bateria de propósito: ele roda o compilador do
+      # TypeScript e o lint sobre o projeto inteiro. Sem este passo, um erro de
+      # tipo numa página passaria pelos testes (que só cobrem `lib/`) e só
+      # apareceria na hora de publicar.
+      - name: Compilar para produção
+        run: npm run build
