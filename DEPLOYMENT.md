@@ -26,10 +26,12 @@ Na primeira publicação, abra **Settings → Pages** no GitHub e selecione **Gi
 
 ## Vercel
 
-1. Crie um projeto na Vercel e importe o repositório `Lucas-Belucci-Bellini/DailyPlanner`.
-2. Defina `frontend` como **Root Directory**.
-3. Use `npm run build` como **Build Command**.
-4. Use `dist` como **Output Directory**.
+O repositório possui um `vercel.json` na raiz. Ele versiona a configuração para que a Vercel instale as dependências em `frontend`, execute o build do Vite e publique `frontend/dist` mesmo quando o projeto for configurado com a raiz do repositório.
+
+1. Importe o repositório `Lucas-Belucci-Bellini/DailyPlanner` na Vercel ou mantenha o projeto `daily-planner` conectado a ele.
+2. Defina `main` como **Production Branch**.
+3. Se o painel solicitar configurações manuais, use `frontend` como **Root Directory**, `npm run build` como **Build Command** e `dist` como **Output Directory**. Com a raiz do repositório selecionada, o `vercel.json` já fornece os comandos equivalentes.
+4. Faça um novo deploy ou aguarde o deploy automático após o merge na `main`.
 
 Nenhuma variável de ambiente é necessária para a versão atual.
 
