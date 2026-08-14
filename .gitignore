@@ -1,34 +1,22 @@
-# Java
-/target
-
-# Node
+# Dependências e builds do frontend
 frontend/node_modules/
 frontend/dist/
-frontend/package-lock.json
 
-# Local data
+# Dados locais e arquivos de ambiente
+.env
+.env.*
+!.env.example
 /dados/
-
-# IDE
-.idea/
-.vscode/
-.DS_Store
-# Build
-target/
-build/
-
-# Banco H2 gravado localmente
-dados/
 *.db
 *.mv.db
 *.trace.db
 
 # IDEs
 .idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.vscode/
 .classpath
 .project
 .settings/

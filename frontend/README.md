@@ -1,20 +1,27 @@
-Front-end mínimo para o DailyPlanner usando Vite (vanilla JS).
+# Frontend do Daily Planner
 
-Configurar:
-- Defina `VITE_API_URL` apontando para a API Java (ex: https://meu-backend.example.com)
+Este diretório contém a aplicação estática do Daily Planner. O código utiliza TypeScript sem framework de componentes, Vite para desenvolvimento e build, e `localStorage` para persistir os compromissos localmente.
 
-Rodar em dev:
+## Desenvolvimento
 
 ```bash
-cd frontend
 npm install
 npm run dev
 ```
 
-Build para produção:
+## Verificação e build
 
 ```bash
+npm run check
 npm run build
+npm run preview
 ```
 
-No Vercel: selecione o diretório `frontend`, comando de build `npm run build` e output `dist`.
+A aplicação possui quatro áreas principais:
+
+| Arquivo | Responsabilidade |
+| --- | --- |
+| `src/main.ts` | Renderização da interface, eventos e operações de CRUD. |
+| `src/types.ts` | Tipos, formatação de datas, duração e regras de validação. |
+| `src/storage.ts` | Leitura e gravação segura dos compromissos no navegador. |
+| `src/style.css` | Layout, identidade visual, responsividade e acessibilidade. |

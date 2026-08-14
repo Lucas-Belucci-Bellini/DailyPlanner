@@ -1,41 +1,42 @@
-Deployment instructions
+# Publicação do Daily Planner
 
-Backend (Docker) — build and run locally
+O Daily Planner é uma aplicação estática. A build final contém apenas HTML, CSS e JavaScript gerado pelo TypeScript, portanto não é necessário configurar servidor, banco de dados ou variáveis secretas para o fluxo atual.
 
-1. Build the Docker image (requires Docker installed):
+## Build local
 
-```bash
-docker build -t dailyplanner-backend:latest .
-```
-
-2. Run the container (expose port 8080):
-
-```bash
-docker run -e TELEGRAM_TOKEN=your_token -e TELEGRAM_CHATID=your_chat_id -p 8080:8080 dailyplanner-backend:latest
-```
-
-Notes about environment variables:
-- Spring reads properties from env vars when available. The properties `telegram.token` and `telegram.chatId` can be provided as the environment variables `TELEGRAM_TOKEN` and `TELEGRAM_CHATID` (dots -> underscores, uppercase). Example: `-e TELEGRAM_TOKEN=... -e TELEGRAM_CHATID=...`.
-- To use a managed Postgres in production, set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` (or use the provider's `DATABASE_URL` mapping). Render/Railway usually expose a `DATABASE_URL` you can map to Spring's properties.
-
-Deploy to Render / Railway / Fly
-
-- Create a new Web Service on Render or Railway and connect your GitHub repo.
-- Use the Dockerfile (recommended) or set the build command `./mvnw -DskipTests package` and start command `java -jar target/*.jar`.
-- Configure environment variables/secrets in the service dashboard (telegram token, chat id, database creds).
-
-Frontend (Vite) — Vercel
-
-- In the Vercel dashboard, create a new project and import this repository.
-- Set the Root Directory to `frontend`.
-- Build Command: `npm run build`.
-- Output Directory: `dist`.
-- Define environment variable `VITE_API_URL` pointing to your backend public URL.
-
-Local frontend dev:
+Na raiz do repositório:
 
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run build
 ```
+
+A pasta `frontend/dist` será criada com os arquivos prontos para publicação. Para revisar a build localmente:
+
+```bash
+npm run preview
+```
+
+## GitHub Pages
+
+O workflow `.github/workflows/deploy-frontend.yml` executa o build automaticamente em cada push para `main` e publica `frontend/dist` no GitHub Pages.
+
+Na primeira publicação, abra **Settings → Pages** no GitHub e selecione **GitHub Actions** como fonte de deploy. Depois, faça um novo push para `main` ou execute o workflow manualmente na aba **Actions**.
+
+## Vercel
+
+1. Crie um projeto na Vercel e importe o repositório `Lucas-Belucci-Bellini/DailyPlanner`.
+2. Defina `frontend` como **Root Directory**.
+3. Use `npm run build` como **Build Command**.
+4. Use `dist` como **Output Directory**.
+
+Nenhuma variável de ambiente é necessária para a versão atual.
+
+## Netlify ou outro servidor estático
+
+Configure o diretório base como `frontend`, o comando de build como `npm run build` e o diretório de publicação como `frontend/dist` ou `dist`, conforme o painel do serviço. O arquivo gerado pode ser servido por qualquer servidor HTTP estático.
+
+## Dados da agenda
+
+Os compromissos são gravados no `localStorage` de cada navegador. Isso significa que o deploy não armazena dados no servidor e que a mesma agenda não aparece automaticamente em outro dispositivo. Para fazer backup, use o botão **Exportar** dentro da aplicação; para restaurar, use **Importar** e selecione o JSON salvo.
