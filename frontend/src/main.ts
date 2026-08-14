@@ -16,7 +16,10 @@ import { loadTasks, replaceTasks, saveTasks } from "./storage";
 import "./style.css";
 
 type Filter = "all" | "pending" | "completed";
-type Action = "toggle" | "edit" | "delete";
+type Theme = "light" | "dark";
+type Action = "toggle" | "edit" | "delete" | "toggle-theme";
+
+const THEME_STORAGE_KEY = "daily-planner.theme.v1";
 
 const appElement = document.querySelector<HTMLDivElement>("#app");
 if (!appElement) throw new Error("Não foi possível montar o Daily Planner.");
@@ -26,7 +29,37 @@ let tasks = loadTasks();
 let selectedDate = todayISO();
 let searchTerm = "";
 let activeFilter: Filter = "all";
+let theme: Theme = loadTheme();
 let toastTimer: number | undefined;
+
+function loadTheme(): Theme {
+  try {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+  } catch {
+    // Em navegadores com armazenamento bloqueado, usamos a preferência do sistema.
+  }
+  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function saveTheme(nextTheme: Theme): void {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  } catch {
+    // A interface continua funcionando mesmo sem persistência da preferência.
+  }
+}
+
+function applyTheme(): void {
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute(
+    "content",
+    theme === "dark" ? "#10251e" : "#162a24",
+  );
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -132,6 +165,10 @@ function render(): void {
             Importar
             <input id="import-file" type="file" accept="application/json,.json" />
           </label>
+          <button class="button subtle theme-toggle" type="button" data-action="toggle-theme" aria-pressed="${theme === "dark"}">
+            <span aria-hidden="true">${theme === "dark" ? "☼" : "◐"}</span>
+            <span>${theme === "dark" ? "Modo claro" : "Modo escuro"}</span>
+          </button>
           <button class="button primary" type="button" data-action="new">+ Novo compromisso</button>
         </div>
       </header>
@@ -268,6 +305,13 @@ function attachEvents(): void {
         render();
       }
       if (action === "export") exportTasks();
+      if (action === "toggle-theme") {
+        theme = theme === "dark" ? "light" : "dark";
+        saveTheme(theme);
+        applyTheme();
+        render();
+        showToast(theme === "dark" ? "Modo escuro ativado." : "Modo claro ativado.");
+      }
       if (action === "toggle" || action === "edit" || action === "delete") {
         handleTaskAction(action, button.dataset.id ?? "");
       }
@@ -433,4 +477,5 @@ function importTasks(file: File): void {
   reader.readAsText(file);
 }
 
+applyTheme();
 render();
