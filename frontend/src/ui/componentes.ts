@@ -5,7 +5,6 @@
 
 import { CATEGORIAS, corCategoria, geraRelatorio, rotuloCategoria } from "../domain/categoria.ts";
 import type { Compromisso } from "../domain/compromisso.ts";
-import { aguardandoRelatorio } from "../domain/compromisso.ts";
 import {
   durationInMinutes,
   formatDayOfMonth,
@@ -14,23 +13,37 @@ import {
   formatTime,
   formatWeekday,
 } from "../domain/datetime.ts";
-import { rotuloReferencia } from "../domain/integracao.ts";
+import { precisaRegistro, rotuloReferencia } from "../domain/integracao.ts";
 import { classes, escaparCor, escaparHtml } from "./html.ts";
 
-/** A ação de relatório só existe quando a integração está ligada E a categoria permite. */
+/**
+ * A ação de relatório só existe quando a integração está ligada E a categoria
+ * permite.
+ *
+ * Enquanto o relatório ainda cobra ação — não criado, rascunho, pendente ou com
+ * erro — a ação é sempre o **handoff**, nunca um link direto. É o handoff que
+ * refaz o aperto de mão, e sem ele o Kizeo não teria para onde devolver o novo
+ * status: um rascunho ficaria marcado como rascunho para sempre na agenda.
+ *
+ * Só quando o relatório está concluído o link direto passa a fazer sentido.
+ */
 function acaoRelatorio(compromisso: Compromisso, integracaoAtiva: boolean): string {
   if (!integracaoAtiva || !geraRelatorio(compromisso.category)) return "";
 
   const referencia = compromisso.report;
-  const temLink = referencia?.reportUrl;
 
-  if (temLink) {
-    return `<a class="button subtle acao-relatorio" href="${escaparHtml(referencia.reportUrl!)}"
+  if (precisaRegistro(referencia)) {
+    const rotulo = referencia?.status === "rascunho" ? "Continuar relatório" : "Registrar relatório";
+    return `<button class="button subtle acao-relatorio" type="button"
+      data-acao="registrar" data-id="${compromisso.id}">${rotulo}</button>`;
+  }
+
+  if (referencia?.reportUrl) {
+    return `<a class="button subtle acao-relatorio" href="${escaparHtml(referencia.reportUrl)}"
       target="_blank" rel="noopener noreferrer">Ver relatório</a>`;
   }
-  const rotulo = aguardandoRelatorio(compromisso) ? "Registrar relatório" : "Abrir relatório";
   return `<button class="button subtle acao-relatorio" type="button"
-    data-acao="registrar" data-id="${compromisso.id}">${rotulo}</button>`;
+    data-acao="registrar" data-id="${compromisso.id}">Abrir relatório</button>`;
 }
 
 function selo(compromisso: Compromisso, integracaoAtiva: boolean): string {
