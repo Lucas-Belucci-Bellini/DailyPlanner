@@ -1,0 +1,3 @@
+# Daily Planner — prompt de engenharia
+
+Leia README, implantação, configuração Vite/TypeScript e testes. O produto é web estático TypeScript estrito + HTML/CSS/Vite e localStorage; não reintroduza backend Java sem decisão. Preserve regras de data/horário, intervalos sem sobreposição, busca, filtros e import/export JSON. Valide entradas; JSON ruim não pode apagar agenda. Considere fuso/data civil. Mantenha acessibilidade, foco, responsividade e tema. Mudança de formato persistido exige compatibilidade/recuperação. Use scripts reais, execute checks proporcionais, registre resultados verdadeiros e preserve diffs locais.
