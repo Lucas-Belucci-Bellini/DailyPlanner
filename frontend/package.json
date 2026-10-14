@@ -6,13 +6,18 @@
   "description": "Agenda diária estática, acessível e persistente no navegador.",
   "scripts": {
     "dev": "vite --host",
-    "build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "build": "tsc --noEmit && vite build",
+    "verify": "npm run check && npm test && npm run build",
     "preview": "vite preview --host"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.21"
+  },
+  "engines": {
+    "node": ">=22.6"
   }
 }

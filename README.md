@@ -1,6 +1,12 @@
 # Daily Planner
 
-O **Daily Planner** é uma agenda diária simples para transformar planos em compromissos claros. A aplicação permite cadastrar, editar, concluir, excluir, buscar e filtrar atividades por data, mantendo os dados salvos no navegador.
+O **Daily Planner** é uma agenda diária para transformar planos em compromissos claros. A aplicação permite cadastrar, editar, concluir, excluir, buscar e filtrar atividades por data, mantendo os dados salvos no navegador.
+
+> **O Daily Planner responde a uma pergunta só: _quando?_**
+>
+> Ele guarda horários, compromissos e o mínimo para saber se algum deles ainda precisa virar relatório. **O que aconteceu durante a atividade é do [Kizeo Forms](https://github.com/Lucas-Belucci-Bellini/Kizeo-Forms)** — a agenda nunca guarda uma cópia disso. Os dois sistemas são independentes: a agenda funciona por inteiro com a integração desligada.
+>
+> O contrato entre eles está em [`docs/INTEGRATION_DAILYPLANNER_KIZEO.md`](./docs/INTEGRATION_DAILYPLANNER_KIZEO.md); a auditoria e as decisões, em [`docs/INTEGRATION_ARCHITECTURE.md`](./docs/INTEGRATION_ARCHITECTURE.md).
 
 > O projeto foi migrado para **TypeScript + Vite**. A decisão elimina a dependência de um backend Java que não estava conectado ao frontend publicado e deixa a aplicação adequada para hospedagem estática, como GitHub Pages.
 
@@ -9,12 +15,18 @@ O **Daily Planner** é uma agenda diária simples para transformar planos em com
 | Recurso | Descrição |
 | --- | --- |
 | Agenda por data | Navegação entre dias, seleção de uma data e atalho para voltar a hoje. |
-| Compromissos | Cadastro de título, descrição, data, horário de início e término. |
+| Visão semanal | Os sete dias da semana lado a lado, com clique para abrir o dia. |
+| Compromissos | Título, observação curta, data, horário de início e término. |
+| Categorias | Aula, Monitoria, Estudo, Projeto, Reunião, Pessoal e Outro, cada uma com sua cor. |
+| Prioridade | Baixa, normal ou alta. |
+| Recorrência | Repetição diária, de segunda a sexta ou semanal, com data final. |
 | Regras de horário | O término precisa ser posterior ao início e intervalos sobrepostos são recusados. |
-| Acompanhamento | Filtros de todos, pendentes e concluídos, com resumo e barra de progresso. |
-| Busca | Pesquisa instantânea por título ou descrição. |
-| Persistência | Os compromissos são salvos no `localStorage` do navegador. |
-| Portabilidade | Exportação e importação da agenda em JSON. |
+| Acompanhamento | Filtros de todos, pendentes, concluídos e sem relatório, com resumo e barra de progresso. |
+| Busca | Pesquisa instantânea por título, observação ou categoria, ignorando acento e caixa. |
+| Resumo do dia | Total, pendentes, concluídos, tempo ocupado, próximo compromisso e progresso. |
+| Integração | Botão para registrar o relatório no Kizeo — só em categorias compatíveis, e só quando ligada. |
+| Persistência | Os compromissos são salvos no `localStorage`, com esquema versionado e migração automática. |
+| Portabilidade | Exportação e importação em JSON, mesclando por padrão em vez de substituir. |
 | Responsividade | Layout adaptado para computador, tablet e celular, com foco visível e suporte a movimento reduzido. |
 | Tema | Modo claro e modo escuro, com detecção da preferência do sistema e escolha salva no navegador. |
 
@@ -28,7 +40,7 @@ A linguagem principal é **TypeScript**, executada no navegador e compilada pelo
 | Build | Vite 5 |
 | Persistência | `localStorage` do navegador |
 | Tema | CSS variables + preferência salva no `localStorage` |
-| Qualidade | TypeScript em modo estrito (`tsc --noEmit`) e build de produção |
+| Qualidade | TypeScript estrito (`tsc --noEmit`) e 62 testes de domínio com `node --test` |
 | Hospedagem | GitHub Pages, Vercel, Netlify ou qualquer servidor de arquivos estáticos |
 
 ## Como executar localmente
@@ -50,8 +62,13 @@ Abra o endereço exibido pelo Vite, normalmente `http://localhost:5173`.
 | --- | --- |
 | `npm run dev` | Inicia o servidor de desenvolvimento com atualização automática. |
 | `npm run check` | Verifica o TypeScript sem gerar arquivos. |
-| `npm run build` | Executa a verificação de tipos e gera a versão de produção em `frontend/dist`. |
+| `npm test` | Roda os testes de domínio (sem dependências: `node --test`). |
+| `npm run verify` | Tipos, testes e build — o que o CI executa. |
+| `npm run build` | Verifica os tipos e gera a versão de produção em `frontend/dist`. |
 | `npm run preview` | Serve localmente a build de produção. |
+
+Os testes usam a remoção nativa de tipos do Node, então exigem **Node 22.6 ou
+superior** e nenhuma dependência de teste.
 
 ## Como usar
 
@@ -66,17 +83,31 @@ DailyPlanner/
 ├── CRONOGRAMA.md             planejamento acadêmico do desenvolvimento
 ├── DEPLOYMENT.md             instruções de publicação
 ├── README.md                 documentação principal
+├── docs/
+│   ├── INTEGRATION_ARCHITECTURE.md        auditoria, decisões e desenho
+│   └── INTEGRATION_DAILYPLANNER_KIZEO.md  o contrato (espelhado no Kizeo)
 ├── .github/workflows/        automação de build e deploy
 └── frontend/
-    ├── index.html            documento HTML principal
-    ├── package.json          scripts e dependências
-    ├── tsconfig.json         configuração TypeScript estrita
-    └── src/
-        ├── main.ts           interface, eventos e fluxo da aplicação
-        ├── storage.ts        persistência e recuperação do localStorage
-        ├── style.css         identidade visual e responsividade
-        └── types.ts          tipos e regras de domínio
+    ├── index.html
+    ├── src/
+    │   ├── domain/           regra de negócio pura: sem DOM, sem localStorage
+    │   │   ├── datetime.ts       datas e horários locais
+    │   │   ├── categoria.ts      catálogo e a regra "esta categoria gera relatório?"
+    │   │   ├── compromisso.ts    a entidade, validação, conflito, resumo
+    │   │   ├── recorrencia.ts    repetição e expansão da série
+    │   │   ├── agenda.ts         busca e filtros
+    │   │   └── integracao.ts     o contrato — só o formato dos dados
+    │   ├── storage/          localStorage com esquema versionado
+    │   ├── integration/      kizeo.ts — o transporte, e o único que sabe como
+    │   ├── ui/               fragmentos de renderização
+    │   ├── main.ts           fiação: estado, render, eventos
+    │   └── style.css
+    └── test/                 testes de domínio (node --test)
 ```
+
+**A regra da estrutura:** `domain/` não conhece navegador. É o que permite testar
+a agenda inteira sem DOM, e o que impede a regra de negócio de se espalhar pela
+interface.
 
 ## Limitações conhecidas
 
@@ -97,4 +128,4 @@ Se o objetivo for transformar o projeto em um produto multiusuário, eu recomend
 
 ## Próximos passos sugeridos
 
-O cronograma acadêmico detalhado está em [`CRONOGRAMA.md`](./CRONOGRAMA.md). Entre as evoluções planejadas estão visão semanal, categorias com cores, lembretes, testes automatizados de regras, banco PostgreSQL com autenticação e sincronização opcional com uma API.
+O cronograma acadêmico detalhado está em [`CRONOGRAMA.md`](./CRONOGRAMA.md). Visão semanal, categorias com cores e testes automatizados já foram entregues. Entre as evoluções ainda planejadas estão lembretes, banco PostgreSQL com autenticação e sincronização entre dispositivos.

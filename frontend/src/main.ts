@@ -1,187 +1,276 @@
-import type { Task, TaskDraft } from "./types";
+/**
+ * DailyPlanner — ponto de entrada.
+ *
+ * A agenda responde a uma pergunta só: **quando?** Ela guarda horários,
+ * compromissos e o mínimo para saber se um deles ainda precisa virar relatório.
+ * O que aconteceu durante a atividade é do Kizeo Forms, e a agenda nunca guarda
+ * uma cópia disso.
+ *
+ * Este arquivo é apenas fiação: estado, renderização e eventos. Regra de negócio
+ * mora em `domain/`, persistência em `storage/`, e a fronteira com o Kizeo em
+ * `integration/`.
+ */
+
 import {
-  createTask,
-  durationInMinutes,
+  CRITERIOS_PADRAO,
+  type CriteriosAgenda,
+  contarPorCategoria,
+  FILTROS,
+  type FiltroStatus,
+  filtrarAgenda,
+  temFiltroAtivo,
+} from "./domain/agenda.ts";
+import { tipoRelatorioDe } from "./domain/categoria.ts";
+import {
+  aguardandoRelatorio,
+  type Compromisso,
+  compromissosDoDia,
+  compromissosNoIntervalo,
+  criarCompromisso,
+  ordenarCompromissos,
+  resumirDia,
+  validarCompromisso,
+} from "./domain/compromisso.ts";
+import {
   formatDuration,
   formatLongDate,
   formatShortDate,
-  formatTime,
   shiftDate,
-  sortTasks,
-  tasksForDate,
+  startOfWeek,
   todayISO,
-  validateTask,
-} from "./types";
-import { loadTasks, replaceTasks, saveTasks } from "./storage";
+  weekDays,
+} from "./domain/datetime.ts";
+import {
+  criarIntegrationId,
+  ORIGEM,
+  type ContextoRelatorio,
+  type ReferenciaRelatorio,
+  type RespostaRelatorio,
+  VERSAO_CONTRATO,
+} from "./domain/integracao.ts";
+import { expandirRecorrencia, novoIdSerie, validarRecorrencia } from "./domain/recorrencia.ts";
+import {
+  carregarAgenda,
+  lerExportacao,
+  mesclarImportacao,
+  montarExportacao,
+  salvarAgenda,
+} from "./storage/agenda.ts";
+import {
+  carregarConfiguracao,
+  type Configuracao,
+  normalizarBaseUrl,
+  origemDe,
+  salvarConfiguracao,
+  type Tema,
+} from "./storage/configuracao.ts";
+import { armazenamentoDisponivel } from "./storage/local.ts";
+import { abrirRegistro, esquecerJanela, iniciarEscuta, limparJanelasFechadas } from "./integration/kizeo.ts";
+import {
+  avisoRelatorios,
+  cartaoCompromisso,
+  cartaoProximo,
+  colunaSemana,
+  estadoVazio,
+  filtrosCategoria,
+  linhaResumo,
+} from "./ui/componentes.ts";
+import { htmlConfiguracoes, lerConfiguracoes } from "./ui/configuracoes.ts";
+import { htmlFormulario, lerFormulario } from "./ui/formulario.ts";
+import { classes, escaparHtml } from "./ui/html.ts";
 import "./style.css";
 
-type Filter = "all" | "pending" | "completed";
-type Theme = "light" | "dark";
-type Action = "toggle" | "edit" | "delete" | "toggle-theme";
+type Visao = "dia" | "semana";
 
-const THEME_STORAGE_KEY = "daily-planner.theme.v1";
+const raiz = document.querySelector<HTMLDivElement>("#app");
+if (!raiz) throw new Error("Não foi possível montar o Daily Planner.");
+const app: HTMLDivElement = raiz;
 
-const appElement = document.querySelector<HTMLDivElement>("#app");
-if (!appElement) throw new Error("Não foi possível montar o Daily Planner.");
-const app: HTMLDivElement = appElement;
+const carga = carregarAgenda();
+let compromissos: Compromisso[] = carga.compromissos;
+let configuracao: Configuracao = carregarConfiguracao();
+let dataSelecionada = todayISO();
+let criterios: CriteriosAgenda = { ...CRITERIOS_PADRAO };
+let visao: Visao = "dia";
+let temporizadorAviso: number | undefined;
 
-let tasks = loadTasks();
-let selectedDate = todayISO();
-let searchTerm = "";
-let activeFilter: Filter = "all";
-let theme: Theme = loadTheme();
-let toastTimer: number | undefined;
+// ---------------------------------------------------------------- persistência
 
-function loadTheme(): Theme {
-  try {
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
-  } catch {
-    // Em navegadores com armazenamento bloqueado, usamos a preferência do sistema.
-  }
-  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
-
-function saveTheme(nextTheme: Theme): void {
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-  } catch {
-    // A interface continua funcionando mesmo sem persistência da preferência.
+function persistir(): void {
+  const resultado = salvarAgenda(compromissos);
+  if (!resultado.ok) {
+    avisar(resultado.motivo ?? "Não foi possível salvar a agenda.", "erro");
   }
 }
 
-function applyTheme(): void {
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute(
-    "content",
-    theme === "dark" ? "#10251e" : "#162a24",
-  );
+// ------------------------------------------------------------------------ tema
+
+function aplicarTema(): void {
+  document.documentElement.dataset.theme = configuracao.tema;
+  document.documentElement.style.colorScheme = configuracao.tema;
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", configuracao.tema === "dark" ? "#10251e" : "#162a24");
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function alternarTema(): void {
+  const proximo: Tema = configuracao.tema === "dark" ? "light" : "dark";
+  configuracao = { ...configuracao, tema: proximo };
+  salvarConfiguracao(configuracao);
+  aplicarTema();
+  renderizar();
+  avisar(proximo === "dark" ? "Modo escuro ativado." : "Modo claro ativado.");
 }
 
-function taskMatches(task: Task): boolean {
-  const matchesFilter =
-    activeFilter === "all" ||
-    (activeFilter === "pending" && !task.completed) ||
-    (activeFilter === "completed" && task.completed);
-  const normalizedSearch = searchTerm.trim().toLocaleLowerCase("pt-BR");
-  const matchesSearch =
-    !normalizedSearch ||
-    `${task.title} ${task.description}`.toLocaleLowerCase("pt-BR").includes(normalizedSearch);
-  return matchesFilter && matchesSearch;
+// -------------------------------------------------------------------- avisos
+
+function avisar(mensagem: string, tom: "sucesso" | "erro" = "sucesso"): void {
+  const regiao = document.querySelector<HTMLDivElement>("#toast-region");
+  if (!regiao) return;
+  window.clearTimeout(temporizadorAviso);
+  regiao.innerHTML = `<div class="toast ${tom}">${tom === "sucesso" ? "✓" : "!"} ${escaparHtml(mensagem)}</div>`;
+  temporizadorAviso = window.setTimeout(() => {
+    regiao.innerHTML = "";
+  }, 4200);
 }
 
-function summaryFor(tasksOfDay: Task[]) {
-  const minutes = tasksOfDay.reduce(
-    (total, task) => total + durationInMinutes(task.startTime, task.endTime),
-    0,
-  );
-  const completed = tasksOfDay.filter((task) => task.completed).length;
-  return {
-    total: tasksOfDay.length,
-    completed,
-    pending: tasksOfDay.length - completed,
-    minutes,
-    percent: tasksOfDay.length ? Math.round((completed / tasksOfDay.length) * 100) : 0,
+// -------------------------------------------------------------- renderização
+
+function baseDaVisao(): Compromisso[] {
+  return visao === "dia"
+    ? compromissosDoDia(compromissos, dataSelecionada)
+    : compromissosNoIntervalo(
+        compromissos,
+        startOfWeek(dataSelecionada),
+        shiftDate(startOfWeek(dataSelecionada), 6),
+      );
+}
+
+function htmlLista(): string {
+  const base = baseDaVisao();
+  const visiveis = filtrarAgenda(base, criterios);
+  const integracaoAtiva = configuracao.integracao.ativa;
+
+  if (visao === "semana") {
+    const hoje = todayISO();
+    const colunas = weekDays(dataSelecionada)
+      .map((data) =>
+        colunaSemana(
+          data,
+          visiveis.filter((compromisso) => compromisso.date === data),
+          data === dataSelecionada,
+          hoje,
+        ),
+      )
+      .join("");
+    return `<div class="grade-semana">${colunas}</div>`;
+  }
+
+  if (!visiveis.length) return estadoVazio(base.length > 0);
+  return visiveis.map((compromisso) => cartaoCompromisso(compromisso, integracaoAtiva)).join("");
+}
+
+/** Redesenha só a lista e os contadores — usado pela busca, para não perder o cursor. */
+function renderizarLista(): void {
+  const lista = app.querySelector<HTMLDivElement>("#task-list");
+  if (!lista) {
+    renderizar();
+    return;
+  }
+  lista.innerHTML = htmlLista();
+  atualizarContadores();
+}
+
+function atualizarContadores(): void {
+  const base = baseDaVisao();
+  const resumo = resumirDia(base);
+  const contagens: Record<FiltroStatus, number> = {
+    todos: base.length,
+    pendentes: resumo.pendentes,
+    concluidos: resumo.concluidos,
+    "sem-relatorio": resumo.relatoriosPendentes,
   };
-}
-
-function renderTask(task: Task): string {
-  const description = task.description
-    ? `<p class="task-description">${escapeHtml(task.description)}</p>`
-    : "";
-  const status = task.completed
-    ? '<span class="status-pill done">Concluído</span>'
-    : '<span class="status-pill pending">Pendente</span>';
-  return `
-    <article class="task-card ${task.completed ? "is-complete" : ""}" data-task-id="${task.id}">
-      <div class="task-time">
-        <strong>${formatTime(task.startTime)}</strong>
-        <span>${formatTime(task.endTime)}</span>
-        <small>${formatDuration(durationInMinutes(task.startTime, task.endTime))}</small>
-      </div>
-      <div class="task-main">
-        <div class="task-heading">
-          <h3>${escapeHtml(task.title)}</h3>
-          ${status}
-        </div>
-        ${description}
-      </div>
-      <div class="task-actions" aria-label="Ações para ${escapeHtml(task.title)}">
-        <button class="icon-button" type="button" data-action="toggle" data-id="${task.id}" aria-label="${task.completed ? "Reabrir" : "Concluir"} compromisso" title="${task.completed ? "Reabrir" : "Concluir"}">${task.completed ? "↶" : "✓"}</button>
-        <button class="icon-button" type="button" data-action="edit" data-id="${task.id}" aria-label="Editar compromisso" title="Editar">✎</button>
-        <button class="icon-button danger" type="button" data-action="delete" data-id="${task.id}" aria-label="Excluir compromisso" title="Excluir">⌫</button>
-      </div>
-    </article>`;
-}
-
-function renderEmptyState(hasAnyTasks: boolean): string {
-  if (!hasAnyTasks) {
-    return `<div class="empty-state">
-      <div class="empty-icon">✦</div>
-      <h3>Seu dia começa por aqui</h3>
-      <p>Adicione um compromisso para transformar seus planos em uma agenda possível.</p>
-      <button class="button primary" type="button" data-action="new">Adicionar compromisso</button>
-    </div>`;
+  for (const filtro of FILTROS) {
+    const alvo = app.querySelector<HTMLSpanElement>(`[data-filtro="${filtro.id}"] span`);
+    if (alvo) alvo.textContent = String(contagens[filtro.id]);
   }
-  return `<div class="empty-state compact">
-    <div class="empty-icon">⌕</div>
-    <h3>Nada encontrado</h3>
-    <p>Tente mudar a busca ou selecionar outro filtro.</p>
-  </div>`;
 }
 
-function render(): void {
-  const dayTasks = tasksForDate(tasks, selectedDate);
-  const visibleTasks = dayTasks.filter(taskMatches);
-  const summary = summaryFor(dayTasks);
-  const today = todayISO();
-  const progressLabel = summary.total === 0 ? "Comece a planejar" : `${summary.percent}% concluído`;
+function proximoCompromisso(): Compromisso | null {
+  const agora = new Date();
+  const hora = `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
+  const hoje = todayISO();
+  return (
+    ordenarCompromissos(compromissos).find(
+      (compromisso) =>
+        !compromisso.completed &&
+        (compromisso.date > hoje || (compromisso.date === hoje && compromisso.endTime >= hora)),
+    ) ?? null
+  );
+}
+
+function pendentesDeRelatorio(): Compromisso[] {
+  if (!configuracao.integracao.ativa) return [];
+  const hoje = todayISO();
+  return ordenarCompromissos(
+    compromissos.filter((compromisso) => compromisso.date <= hoje && aguardandoRelatorio(compromisso)),
+  ).reverse();
+}
+
+function renderizar(): void {
+  const base = baseDaVisao();
+  const resumo = resumirDia(base);
+  const hoje = todayISO();
+  const contagemCategorias = contarPorCategoria(base);
+  const rotuloProgresso = resumo.total === 0 ? "Comece a planejar" : `${resumo.percentual}% concluído`;
+  const semanaInicio = startOfWeek(dataSelecionada);
+  const tituloConteudo =
+    visao === "dia"
+      ? formatLongDate(dataSelecionada)
+      : `Semana de ${formatShortDate(semanaInicio)} a ${formatShortDate(shiftDate(semanaInicio, 6))}`;
+
+  const contagens: Record<FiltroStatus, number> = {
+    todos: base.length,
+    pendentes: resumo.pendentes,
+    concluidos: resumo.concluidos,
+    "sem-relatorio": resumo.relatoriosPendentes,
+  };
 
   app.innerHTML = `
     <div class="app-shell">
       <header class="app-header">
-        <a class="brand" href="#" data-action="home" aria-label="Ir para hoje">
+        <button class="brand" type="button" data-acao="hoje" aria-label="Ir para hoje">
           <span class="brand-mark">DP</span>
           <span>
             <span class="eyebrow">PLANEJAMENTO PESSOAL</span>
             <strong>Daily Planner</strong>
           </span>
-        </a>
+        </button>
         <div class="header-actions">
-          <button class="button subtle" type="button" data-action="export">Exportar</button>
+          <button class="button subtle" type="button" data-acao="exportar">Exportar</button>
           <label class="button subtle import-button">
             Importar
             <input id="import-file" type="file" accept="application/json,.json" />
           </label>
-          <button class="button subtle theme-toggle" type="button" data-action="toggle-theme" aria-pressed="${theme === "dark"}">
-            <span aria-hidden="true">${theme === "dark" ? "☼" : "◐"}</span>
-            <span>${theme === "dark" ? "Modo claro" : "Modo escuro"}</span>
+          <button class="button subtle" type="button" data-acao="configuracoes">Configurações</button>
+          <button class="button subtle theme-toggle" type="button" data-acao="tema"
+            aria-pressed="${configuracao.tema === "dark"}">
+            <span aria-hidden="true">${configuracao.tema === "dark" ? "☼" : "◐"}</span>
+            <span>${configuracao.tema === "dark" ? "Modo claro" : "Modo escuro"}</span>
           </button>
-          <button class="button primary" type="button" data-action="new">+ Novo compromisso</button>
+          <button class="button primary" type="button" data-acao="novo">+ Novo compromisso</button>
         </div>
       </header>
 
       <section class="welcome-panel">
         <div>
-          <span class="eyebrow light">${selectedDate === today ? "SEU FOCO DE HOJE" : "VISÃO DA AGENDA"}</span>
+          <span class="eyebrow light">${dataSelecionada === hoje ? "SEU FOCO DE HOJE" : "VISÃO DA AGENDA"}</span>
           <h1>Um dia de cada vez.</h1>
           <p>Organize o que importa e deixe espaço para o que surgir.</p>
         </div>
         <div class="welcome-stamp" aria-hidden="true">
-          <span>${String(summary.total).padStart(2, "0")}</span>
-          <small>itens no dia</small>
+          <span>${String(resumo.total).padStart(2, "0")}</span>
+          <small>${visao === "dia" ? "itens no dia" : "itens na semana"}</small>
         </div>
       </section>
 
@@ -190,292 +279,661 @@ function render(): void {
           <section class="date-card">
             <div class="section-label">NAVEGAR</div>
             <div class="date-navigation">
-              <button class="icon-button" type="button" data-date-shift="-1" aria-label="Dia anterior">←</button>
+              <button class="icon-button" type="button" data-passo="-1"
+                aria-label="${visao === "dia" ? "Dia anterior" : "Semana anterior"}">←</button>
               <div class="selected-date">
-                <strong>${formatShortDate(selectedDate)}</strong>
-                <span>${selectedDate === today ? "Hoje" : "Data selecionada"}</span>
+                <strong>${formatShortDate(dataSelecionada)}</strong>
+                <span>${dataSelecionada === hoje ? "Hoje" : "Data selecionada"}</span>
               </div>
-              <button class="icon-button" type="button" data-date-shift="1" aria-label="Próximo dia">→</button>
+              <button class="icon-button" type="button" data-passo="1"
+                aria-label="${visao === "dia" ? "Próximo dia" : "Próxima semana"}">→</button>
             </div>
             <label class="date-picker-label" for="date-picker">Escolher outra data</label>
-            <input id="date-picker" class="date-picker" type="date" value="${selectedDate}" />
-            <button class="button full subtle" type="button" data-action="today">Voltar para hoje</button>
+            <input id="date-picker" class="date-picker" type="date" value="${dataSelecionada}" />
+            <button class="button full subtle" type="button" data-acao="hoje">Voltar para hoje</button>
           </section>
 
           <section class="sidebar-section">
-            <div class="section-label">RESUMO DO DIA</div>
+            <div class="section-label">PRÓXIMO COMPROMISSO</div>
+            ${cartaoProximo(proximoCompromisso())}
+          </section>
+
+          <section class="sidebar-section">
+            <div class="section-label">RESUMO ${visao === "dia" ? "DO DIA" : "DA SEMANA"}</div>
             <div class="summary-list">
-              <div class="summary-row"><span>Total</span><strong>${summary.total}</strong></div>
-              <div class="summary-row"><span>Pendentes</span><strong>${summary.pending}</strong></div>
-              <div class="summary-row"><span>Concluídos</span><strong>${summary.completed}</strong></div>
-              <div class="summary-row"><span>Tempo ocupado</span><strong>${formatDuration(summary.minutes)}</strong></div>
+              ${linhaResumo("Total", String(resumo.total))}
+              ${linhaResumo("Pendentes", String(resumo.pendentes))}
+              ${linhaResumo("Concluídos", String(resumo.concluidos))}
+              ${linhaResumo("Tempo ocupado", formatDuration(resumo.minutos))}
             </div>
             <div class="progress-block">
-              <div><span>Progresso</span><strong>${progressLabel}</strong></div>
-              <div class="progress-track" role="progressbar" aria-valuenow="${summary.percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${progressLabel}"><span style="width: ${summary.percent}%"></span></div>
+              <div><span>Progresso</span><strong>${rotuloProgresso}</strong></div>
+              <div class="progress-track" role="progressbar" aria-valuenow="${resumo.percentual}"
+                aria-valuemin="0" aria-valuemax="100" aria-label="${rotuloProgresso}">
+                <span style="width: ${resumo.percentual}%"></span>
+              </div>
             </div>
           </section>
 
-          <section class="tip-card">
-            <span class="tip-symbol">✦</span>
-            <div><strong>Dica de organização</strong><p>Reserve alguns minutos entre compromissos para respirar e fazer transições.</p></div>
-          </section>
+          ${avisoRelatorios(pendentesDeRelatorio())}
         </aside>
 
         <section class="agenda-content" aria-labelledby="agenda-heading">
           <div class="content-heading">
             <div>
-              <span class="eyebrow">${selectedDate === today ? "AGENDA DE HOJE" : "AGENDA"}</span>
-              <h2 id="agenda-heading">${formatLongDate(selectedDate)}</h2>
+              <span class="eyebrow">${dataSelecionada === hoje && visao === "dia" ? "AGENDA DE HOJE" : "AGENDA"}</span>
+              <h2 id="agenda-heading">${escaparHtml(tituloConteudo)}</h2>
             </div>
             <div class="search-box">
               <span aria-hidden="true">⌕</span>
               <label class="sr-only" for="search">Buscar compromissos</label>
-              <input id="search" type="search" placeholder="Buscar compromisso" value="${escapeHtml(searchTerm)}" />
+              <input id="search" type="search" placeholder="Buscar compromisso"
+                value="${escaparHtml(criterios.busca)}" />
             </div>
           </div>
 
-          <div class="filter-row" role="toolbar" aria-label="Filtrar compromissos">
-            <button class="filter-button ${activeFilter === "all" ? "active" : ""}" type="button" data-filter="all">Todos <span>${dayTasks.length}</span></button>
-            <button class="filter-button ${activeFilter === "pending" ? "active" : ""}" type="button" data-filter="pending">Pendentes <span>${summary.pending}</span></button>
-            <button class="filter-button ${activeFilter === "completed" ? "active" : ""}" type="button" data-filter="completed">Concluídos <span>${summary.completed}</span></button>
+          <div class="barra-visao" role="tablist" aria-label="Modo de visualização">
+            <button class="${classes("botao-visao", visao === "dia" && "active")}" type="button"
+              role="tab" aria-selected="${visao === "dia"}" data-visao="dia">Dia</button>
+            <button class="${classes("botao-visao", visao === "semana" && "active")}" type="button"
+              role="tab" aria-selected="${visao === "semana"}" data-visao="semana">Semana</button>
           </div>
 
-          <div class="agenda-list" id="task-list">
-            ${visibleTasks.length ? visibleTasks.map(renderTask).join("") : renderEmptyState(dayTasks.length > 0)}
+          <div class="filter-row" role="toolbar" aria-label="Filtrar compromissos">
+            ${FILTROS.map(
+              (filtro) => `<button class="${classes("filter-button", criterios.status === filtro.id && "active")}"
+                type="button" data-filtro="${filtro.id}">${filtro.rotulo} <span>${contagens[filtro.id]}</span></button>`,
+            ).join("")}
           </div>
-          <p class="storage-note"><span>●</span> Seus dados ficam salvos neste navegador.</p>
+
+          <div class="categoria-row" aria-label="Filtrar por categoria">
+            ${filtrosCategoria(criterios.categoria, contagemCategorias)}
+            ${
+              temFiltroAtivo(criterios)
+                ? '<button class="chip-categoria limpar" type="button" data-acao="limpar-filtros">Limpar filtros</button>'
+                : ""
+            }
+          </div>
+
+          <div class="agenda-list ${visao === "semana" ? "modo-semana" : ""}" id="task-list">${htmlLista()}</div>
+
+          <p class="storage-note">
+            <span>●</span>
+            ${
+              armazenamentoDisponivel()
+                ? "Seus dados ficam salvos neste navegador."
+                : "Este navegador bloqueou o armazenamento: os dados não serão salvos."
+            }
+          </p>
         </section>
       </main>
       <div id="dialog-root"></div>
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>`;
-
-  attachEvents();
 }
 
-function showToast(message: string, tone: "success" | "error" = "success"): void {
-  const region = document.querySelector<HTMLDivElement>("#toast-region");
-  if (!region) return;
-  window.clearTimeout(toastTimer);
-  region.innerHTML = `<div class="toast ${tone}">${tone === "success" ? "✓" : "!"} ${escapeHtml(message)}</div>`;
-  toastTimer = window.setTimeout(() => {
-    region.innerHTML = "";
-  }, 3600);
+// ------------------------------------------------------------------- diálogos
+
+function fecharDialogo(): void {
+  const raizDialogo = document.querySelector<HTMLDivElement>("#dialog-root");
+  if (raizDialogo) raizDialogo.innerHTML = "";
 }
 
-function attachEvents(): void {
-  app.querySelectorAll<HTMLElement>("[data-date-shift]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const shift = Number(button.dataset.dateShift ?? 0);
-      selectedDate = shiftDate(selectedDate, shift);
-      render();
-    });
+function abrirFormulario(compromisso?: Compromisso): void {
+  const raizDialogo = document.querySelector<HTMLDivElement>("#dialog-root");
+  if (!raizDialogo) return;
+  raizDialogo.innerHTML = htmlFormulario(dataSelecionada, compromisso);
+
+  const dialogo = raizDialogo.querySelector<HTMLDialogElement>("#task-dialog");
+  const form = raizDialogo.querySelector<HTMLFormElement>("#task-form");
+  if (!dialogo || !form) return;
+  dialogo.showModal();
+  dialogo.addEventListener("close", fecharDialogo);
+  dialogo.addEventListener("click", (evento) => {
+    if (evento.target === dialogo) dialogo.close();
+  });
+  form.querySelectorAll<HTMLElement>("[data-fechar]").forEach((botao) => {
+    botao.addEventListener("click", () => dialogo.close());
   });
 
-  app.querySelector<HTMLInputElement>("#date-picker")?.addEventListener("change", (event) => {
-    const input = event.currentTarget as HTMLInputElement;
-    if (input.value) {
-      selectedDate = input.value;
-      render();
+  const marcadorRepetir = form.querySelector<HTMLInputElement>('[name="repetir"]');
+  const camposRepeticao = form.querySelector<HTMLDivElement>(".repeticao-campos");
+  marcadorRepetir?.addEventListener("change", () => {
+    if (camposRepeticao) camposRepeticao.hidden = !marcadorRepetir.checked;
+  });
+
+  form.addEventListener("submit", (evento) => {
+    evento.preventDefault();
+    submeterFormulario(form, dialogo, compromisso);
+  });
+}
+
+function mostrarErroFormulario(form: HTMLFormElement, campo: string, mensagem: string): void {
+  const caixa = form.querySelector<HTMLDivElement>("#form-error");
+  const especifico = form.querySelector<HTMLElement>(`#error-${campo}`);
+  if (especifico) {
+    especifico.textContent = mensagem;
+    especifico.classList.add("visible");
+  } else if (caixa) {
+    caixa.textContent = mensagem;
+  }
+  form.querySelector<HTMLElement>(`[name="${campo}"]`)?.focus();
+}
+
+function submeterFormulario(
+  form: HTMLFormElement,
+  dialogo: HTMLDialogElement,
+  compromisso?: Compromisso,
+): void {
+  form.querySelectorAll<HTMLElement>(".field small").forEach((elemento) => {
+    elemento.textContent = "";
+    elemento.classList.remove("visible");
+  });
+  const caixa = form.querySelector<HTMLDivElement>("#form-error");
+  if (caixa) caixa.textContent = "";
+
+  const { rascunho, recorrencia } = lerFormulario(form);
+  const erro = validarCompromisso(rascunho, compromissos, compromisso?.id);
+  if (erro) {
+    mostrarErroFormulario(form, erro.campo, erro.message);
+    return;
+  }
+
+  if (compromisso) {
+    aplicarEdicao(compromisso, rascunho);
+    dialogo.close();
+    dataSelecionada = rascunho.date;
+    persistir();
+    renderizar();
+    avisar("Compromisso atualizado.");
+    return;
+  }
+
+  if (recorrencia) {
+    const erroRegra = validarRecorrencia(rascunho.date, recorrencia);
+    if (erroRegra) {
+      mostrarErroFormulario(form, "ate", erroRegra.message);
+      const caixaErro = form.querySelector<HTMLDivElement>("#form-error");
+      if (caixaErro) caixaErro.textContent = erroRegra.message;
+      return;
     }
-  });
+  }
 
-  app.querySelector<HTMLInputElement>("#search")?.addEventListener("input", (event) => {
-    searchTerm = (event.currentTarget as HTMLInputElement).value;
-    render();
-    const search = app.querySelector<HTMLInputElement>("#search");
-    search?.focus();
-    search?.setSelectionRange(search.value.length, search.value.length);
-  });
+  const criados = criarSerie(rascunho, recorrencia);
+  if (!criados.aceitos.length) {
+    const caixaErro = form.querySelector<HTMLDivElement>("#form-error");
+    if (caixaErro) caixaErro.textContent = "Todas as datas da repetição conflitam com a agenda.";
+    return;
+  }
 
-  app.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      activeFilter = (button.dataset.filter as Filter) ?? "all";
-      render();
-    });
-  });
-
-  app.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) => {
-    const action = button.dataset.action as Action | "new" | "today" | "export" | "home" | undefined;
-    button.addEventListener("click", () => {
-      if (action === "new") openForm();
-      if (action === "today" || action === "home") {
-        selectedDate = todayISO();
-        render();
-      }
-      if (action === "export") exportTasks();
-      if (action === "toggle-theme") {
-        theme = theme === "dark" ? "light" : "dark";
-        saveTheme(theme);
-        applyTheme();
-        render();
-        showToast(theme === "dark" ? "Modo escuro ativado." : "Modo claro ativado.");
-      }
-      if (action === "toggle" || action === "edit" || action === "delete") {
-        handleTaskAction(action, button.dataset.id ?? "");
-      }
-    });
-  });
-
-  app.querySelector<HTMLInputElement>("#import-file")?.addEventListener("change", (event) => {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (file) importTasks(file);
-  });
+  compromissos = ordenarCompromissos([...compromissos, ...criados.aceitos]);
+  dataSelecionada = rascunho.date;
+  dialogo.close();
+  persistir();
+  renderizar();
+  avisar(
+    criados.recusados
+      ? `${criados.aceitos.length} compromisso(s) adicionado(s). ${criados.recusados} data(s) em conflito foram puladas.`
+      : criados.aceitos.length > 1
+        ? `${criados.aceitos.length} compromissos adicionados à agenda.`
+        : "Compromisso adicionado à agenda.",
+    criados.recusados ? "erro" : "sucesso",
+  );
 }
 
-function handleTaskAction(action: Action, id: string): void {
-  const task = tasks.find((item) => item.id === id);
-  if (!task) return;
-  if (action === "toggle") {
-    task.completed = !task.completed;
-    saveTasks(tasks);
-    render();
-    showToast(task.completed ? "Compromisso concluído." : "Compromisso reaberto.");
-  }
-  if (action === "edit") openForm(task);
-  if (action === "delete") {
-    if (!window.confirm(`Excluir “${task.title}”?`)) return;
-    tasks = tasks.filter((item) => item.id !== id);
-    saveTasks(tasks);
-    render();
-    showToast("Compromisso excluído.");
-  }
+/**
+ * Editar um compromisso pode invalidar a referência de relatório: se a categoria
+ * mudou, o tipo de relatório mudou junto, e a referência antiga aponta para um
+ * registro de outro tipo. Nesse caso a referência é descartada — a agenda passa
+ * a mostrar "não criado" em vez de mentir sobre um relatório que não corresponde.
+ */
+function aplicarEdicao(compromisso: Compromisso, rascunho: ReturnType<typeof lerFormulario>["rascunho"]): void {
+  const trocouCategoria = compromisso.category !== rascunho.category;
+  compromissos = compromissos.map((item) =>
+    item.id === compromisso.id
+      ? {
+          ...item,
+          ...rascunho,
+          title: rascunho.title.trim(),
+          description: rascunho.description.trim(),
+          report: trocouCategoria ? null : item.report,
+        }
+      : item,
+  );
 }
 
-function openForm(task?: Task): void {
-  const dialogRoot = document.querySelector<HTMLDivElement>("#dialog-root");
-  if (!dialogRoot) return;
-  const isEditing = Boolean(task);
-  const draft: TaskDraft = task
-    ? {
-        title: task.title,
-        description: task.description,
-        date: task.date,
-        startTime: task.startTime,
-        endTime: task.endTime,
-      }
-    : { title: "", description: "", date: selectedDate, startTime: "09:00", endTime: "10:00" };
+interface SerieCriada {
+  aceitos: Compromisso[];
+  recusados: number;
+}
 
-  dialogRoot.innerHTML = `
-    <dialog class="task-dialog" id="task-dialog" aria-labelledby="dialog-title">
-      <form id="task-form" method="dialog" novalidate>
-        <div class="dialog-heading">
-          <div><span class="eyebrow">${isEditing ? "EDITAR PLANO" : "NOVO PLANO"}</span><h2 id="dialog-title">${isEditing ? "Ajustar compromisso" : "O que você quer realizar?"}</h2></div>
-          <button class="icon-button" type="button" data-close aria-label="Fechar">×</button>
-        </div>
-        <div id="form-error" class="form-error" role="alert"></div>
-        <div class="form-grid">
-          <label class="field full-field">Título <span>*</span><input name="title" type="text" maxlength="120" placeholder="Ex.: Estudar para a prova" value="${escapeHtml(draft.title)}" autofocus /><small id="error-title"></small></label>
-          <label class="field full-field">Descrição <small class="counter-hint">opcional</small><textarea name="description" maxlength="500" rows="3" placeholder="Anote detalhes, materiais ou o seu próximo passo">${escapeHtml(draft.description)}</textarea></label>
-          <label class="field">Data <span>*</span><input name="date" type="date" value="${draft.date}" /></label>
-          <div class="field time-range"><label>Horário <span>*</span></label><div class="time-inputs"><input name="startTime" type="time" value="${draft.startTime}" aria-label="Horário de início" /><span>até</span><input name="endTime" type="time" value="${draft.endTime}" aria-label="Horário de término" /></div><small id="error-startTime"></small><small id="error-endTime"></small></div>
-        </div>
-        <div class="dialog-actions"><button class="button subtle" type="button" data-close>Cancelar</button><button class="button primary" type="submit">${isEditing ? "Salvar alterações" : "Adicionar à agenda"}</button></div>
-      </form>
-    </dialog>`;
+/** Materializa a série, pulando as datas que colidiriam com algo já marcado. */
+function criarSerie(
+  rascunho: ReturnType<typeof lerFormulario>["rascunho"],
+  recorrencia: ReturnType<typeof lerFormulario>["recorrencia"],
+): SerieCriada {
+  if (!recorrencia) {
+    return { aceitos: [criarCompromisso(rascunho)], recusados: 0 };
+  }
 
-  const dialog = dialogRoot.querySelector<HTMLDialogElement>("#task-dialog");
-  const form = dialogRoot.querySelector<HTMLFormElement>("#task-form");
-  if (!dialog || !form) return;
-  dialog.showModal();
+  const serieId = novoIdSerie();
+  const datas = expandirRecorrencia(rascunho.date, recorrencia);
+  const aceitos: Compromisso[] = [];
+  let recusados = 0;
 
-  dialog.addEventListener("click", (event) => {
-    if (event.target === dialog) dialog.close();
+  for (const data of datas) {
+    const candidato = { ...rascunho, date: data };
+    if (validarCompromisso(candidato, [...compromissos, ...aceitos])) {
+      recusados += 1;
+      continue;
+    }
+    aceitos.push(criarCompromisso(rascunho, { date: data, seriesId: serieId }));
+  }
+
+  return { aceitos, recusados };
+}
+
+function abrirConfiguracoes(): void {
+  const raizDialogo = document.querySelector<HTMLDivElement>("#dialog-root");
+  if (!raizDialogo) return;
+  raizDialogo.innerHTML = htmlConfiguracoes(configuracao);
+
+  const dialogo = raizDialogo.querySelector<HTMLDialogElement>("#config-dialog");
+  const form = raizDialogo.querySelector<HTMLFormElement>("#config-form");
+  if (!dialogo || !form) return;
+  dialogo.showModal();
+  dialogo.addEventListener("close", fecharDialogo);
+  dialogo.addEventListener("click", (evento) => {
+    if (evento.target === dialogo) dialogo.close();
   });
-  dialog.querySelectorAll<HTMLElement>("[data-close]").forEach((closeButton) => {
-    closeButton.addEventListener("click", () => dialog.close());
+  form.querySelectorAll<HTMLElement>("[data-fechar]").forEach((botao) => {
+    botao.addEventListener("click", () => dialogo.close());
   });
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    const nextDraft: TaskDraft = {
-      title: String(data.get("title") ?? ""),
-      description: String(data.get("description") ?? ""),
-      date: String(data.get("date") ?? ""),
-      startTime: String(data.get("startTime") ?? ""),
-      endTime: String(data.get("endTime") ?? ""),
-    };
-    const error = validateTask(nextDraft, tasks, task?.id);
-    if (error) {
-      const errorBox = form.querySelector<HTMLDivElement>("#form-error");
-      const fieldError = form.querySelector<HTMLElement>(`#error-${error.field}`);
-      if (error.field === "form") {
-        if (errorBox) errorBox.textContent = error.message;
-      } else if (fieldError) {
-        fieldError.textContent = error.message;
-        fieldError.classList.add("visible");
-      }
-      const firstInvalid = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${error.field === "form" ? "title" : error.field}"]`);
-      firstInvalid?.focus();
+
+  form.addEventListener("submit", (evento) => {
+    evento.preventDefault();
+    const leitura = lerConfiguracoes(form);
+    const caixa = form.querySelector<HTMLDivElement>("#config-error");
+
+    const normalizada = normalizarBaseUrl(leitura.baseUrl);
+    if (!normalizada) {
+      if (caixa) caixa.textContent = "Informe um endereço http(s) válido, ou deixe o campo vazio.";
+      return;
+    }
+    if (leitura.ativa && !normalizada.url) {
+      if (caixa) caixa.textContent = "Informe o endereço do Kizeo para ativar a integração.";
       return;
     }
 
-    let successMessage: string;
-    if (task) {
-      tasks = tasks.map((item) => (item.id === task.id ? { ...item, ...nextDraft, title: nextDraft.title.trim(), description: nextDraft.description.trim() } : item));
-      successMessage = "Compromisso atualizado.";
-    } else {
-      tasks = [...tasks, createTask(nextDraft)];
-      successMessage = "Compromisso adicionado à agenda.";
-    }
-    selectedDate = nextDraft.date;
-    replaceTasks(tasks);
-    dialog.close();
-    render();
-    showToast(successMessage);
+    configuracao = {
+      ...configuracao,
+      integracao: {
+        ativa: leitura.ativa && normalizada.url !== "",
+        baseUrl: normalizada.url,
+        abrirEmNovaAba: leitura.abrirEmNovaAba,
+      },
+    };
+    salvarConfiguracao(configuracao);
+    dialogo.close();
+    renderizar();
+    avisar(
+      normalizada.sanitizada
+        ? "Configurações salvas. Credenciais e parâmetros foram removidos do endereço."
+        : "Configurações salvas.",
+    );
   });
 }
 
-function exportTasks(): void {
-  if (!tasks.length) {
-    showToast("Adicione pelo menos um compromisso antes de exportar.", "error");
+// -------------------------------------------------------------- integração
+
+/** Anexa ou atualiza a referência de relatório de um compromisso. */
+function atualizarReferencia(id: string, referencia: ReferenciaRelatorio | null): void {
+  compromissos = compromissos.map((item) => (item.id === id ? { ...item, report: referencia } : item));
+  persistir();
+}
+
+function registrarRelatorio(compromisso: Compromisso): void {
+  const { integracao } = configuracao;
+  if (!integracao.ativa) {
+    avisar("Ative a integração com o Kizeo nas configurações.", "erro");
     return;
   }
-  const blob = new Blob([JSON.stringify(sortTasks(tasks), null, 2)], { type: "application/json" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `daily-planner-${todayISO()}.json`;
-  link.click();
-  URL.revokeObjectURL(link.href);
-  showToast("Agenda exportada com sucesso.");
+  const tipo = tipoRelatorioDe(compromisso.category);
+  if (!tipo) {
+    avisar("Esta categoria não gera relatório no Kizeo.", "erro");
+    return;
+  }
+
+  const integrationId = criarIntegrationId(compromisso.id, tipo);
+  const contexto: ContextoRelatorio = {
+    v: VERSAO_CONTRATO,
+    source: ORIGEM,
+    integrationId,
+    reportType: tipo,
+    schedule: {
+      id: compromisso.id,
+      date: compromisso.date,
+      start: compromisso.startTime,
+      end: compromisso.endTime,
+      title: compromisso.title,
+      category: compromisso.category,
+      ...(compromisso.description ? { notes: compromisso.description } : {}),
+    },
+  };
+
+  // A intenção é registrada ANTES de abrir a janela: se o usuário estiver
+  // offline, fechar a aba ou o navegador bloquear o pop-up, o compromisso
+  // continua marcado como pendente e reaparece na lista de "a registrar".
+  atualizarReferencia(compromisso.id, {
+    integrationId,
+    status: "pendente",
+    reportId: compromisso.report?.reportId ?? null,
+    reportUrl: compromisso.report?.reportUrl ?? null,
+    reportType: tipo,
+    updatedAt: new Date().toISOString(),
+    message: null,
+  });
+
+  const resultado = abrirRegistro({
+    baseUrl: integracao.baseUrl,
+    abrirEmNovaAba: integracao.abrirEmNovaAba,
+    contexto,
+  });
+
+  if (!resultado.ok) {
+    atualizarReferencia(compromisso.id, {
+      integrationId,
+      status: "erro",
+      reportId: null,
+      reportUrl: null,
+      reportType: tipo,
+      updatedAt: new Date().toISOString(),
+      message: resultado.motivo,
+    });
+    renderizar();
+    avisar(resultado.motivo, "erro");
+    return;
+  }
+
+  renderizar();
+  avisar("Contexto enviado ao Kizeo. Preencha o relatório na janela aberta.");
 }
 
-function importTasks(file: File): void {
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    try {
-      const parsed: unknown = JSON.parse(String(reader.result));
-      if (!Array.isArray(parsed)) throw new Error("Formato inválido");
-      const imported: Task[] = parsed
-        .filter((item): item is Task => {
-          if (!item || typeof item !== "object") return false;
-          const value = item as Partial<Task>;
-          return [value.id, value.title, value.date, value.startTime, value.endTime].every((field) => typeof field === "string");
-        })
-        .map((item) => ({
-          id: item.id,
-          title: item.title,
-          description: typeof item.description === "string" ? item.description : "",
-          date: item.date,
-          startTime: item.startTime,
-          endTime: item.endTime,
-          completed: item.completed === true,
-          createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
-        }));
-      if (!imported.length) throw new Error("Nenhum compromisso encontrado");
-      tasks = imported;
-      replaceTasks(tasks);
-      selectedDate = imported[0].date;
-      render();
-      showToast(`${imported.length} compromisso(s) importado(s).`);
-    } catch {
-      showToast("Não foi possível importar este arquivo JSON.", "error");
+function receberReferencia(resposta: RespostaRelatorio): void {
+  const alvo = compromissos.find(
+    (compromisso) => compromisso.report?.integrationId === resposta.integrationId,
+  );
+  if (!alvo) return;
+
+  atualizarReferencia(alvo.id, {
+    integrationId: resposta.integrationId,
+    status: resposta.status,
+    reportId: resposta.reportId,
+    reportUrl: resposta.reportUrl,
+    reportType: resposta.reportType ?? alvo.report?.reportType ?? null,
+    updatedAt: new Date().toISOString(),
+    message: null,
+  });
+
+  if (resposta.status !== "pendente" && resposta.status !== "erro") {
+    esquecerJanela(resposta.integrationId);
+  }
+  renderizar();
+  avisar(
+    resposta.status === "enviado"
+      ? "Relatório enviado no Kizeo."
+      : resposta.status === "rascunho"
+        ? "Rascunho salvo no Kizeo."
+        : "Relatório registrado no Kizeo.",
+  );
+}
+
+// -------------------------------------------------------- exportar / importar
+
+function exportar(): void {
+  if (!compromissos.length) {
+    avisar("Adicione pelo menos um compromisso antes de exportar.", "erro");
+    return;
+  }
+  const blob = new Blob([montarExportacao(compromissos)], { type: "application/json" });
+  const endereco = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = endereco;
+  link.download = `daily-planner-${todayISO()}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revogar imediatamente cancelava o download em alguns navegadores.
+  window.setTimeout(() => URL.revokeObjectURL(endereco), 30_000);
+  avisar("Agenda exportada com sucesso.");
+}
+
+function importar(arquivo: File): void {
+  const leitor = new FileReader();
+  leitor.addEventListener("error", () => avisar("Não foi possível ler o arquivo.", "erro"));
+  leitor.addEventListener("load", () => {
+    const importados = lerExportacao(String(leitor.result));
+    if (!importados) {
+      avisar("Não foi possível importar este arquivo JSON.", "erro");
+      return;
+    }
+
+    const substituir =
+      compromissos.length > 0 &&
+      window.confirm(
+        `Foram encontrados ${importados.length} compromisso(s).\n\n` +
+          "OK — substituir toda a agenda atual.\n" +
+          "Cancelar — juntar com o que já existe (recomendado).",
+      );
+
+    const resultado = mesclarImportacao(
+      compromissos,
+      importados,
+      substituir ? "substituir" : "mesclar",
+    );
+    compromissos = resultado.compromissos;
+    persistir();
+    if (compromissos.length) dataSelecionada = compromissos[0].date;
+    renderizar();
+    avisar(
+      resultado.ignorados
+        ? `${resultado.adicionados} compromisso(s) importado(s). ${resultado.ignorados} já existia(m).`
+        : `${resultado.adicionados} compromisso(s) importado(s).`,
+    );
+  });
+  leitor.readAsText(arquivo);
+}
+
+// ---------------------------------------------------------------- ações
+
+function acaoCompromisso(acao: string, id: string): void {
+  const compromisso = compromissos.find((item) => item.id === id);
+  if (!compromisso) return;
+
+  if (acao === "concluir") {
+    compromissos = compromissos.map((item) =>
+      item.id === id ? { ...item, completed: !item.completed } : item,
+    );
+    persistir();
+    renderizar();
+    avisar(compromisso.completed ? "Compromisso reaberto." : "Compromisso concluído.");
+    return;
+  }
+
+  if (acao === "editar") {
+    abrirFormulario(compromisso);
+    return;
+  }
+
+  if (acao === "registrar") {
+    registrarRelatorio(compromisso);
+    return;
+  }
+
+  if (acao === "excluir") {
+    excluir(compromisso);
+  }
+}
+
+function excluir(compromisso: Compromisso): void {
+  const naSerie = compromisso.seriesId
+    ? compromissos.filter((item) => item.seriesId === compromisso.seriesId).length
+    : 0;
+
+  if (naSerie > 1) {
+    const serieInteira = window.confirm(
+      `“${compromisso.title}” faz parte de uma série com ${naSerie} ocorrências.\n\n` +
+        "OK — excluir a série inteira.\n" +
+        "Cancelar — excluir apenas esta ocorrência.",
+    );
+    if (serieInteira) {
+      compromissos = compromissos.filter((item) => item.seriesId !== compromisso.seriesId);
+      persistir();
+      renderizar();
+      avisar(`Série excluída (${naSerie} compromissos).`);
+      return;
+    }
+  } else if (!window.confirm(`Excluir “${compromisso.title}”?`)) {
+    return;
+  }
+
+  compromissos = compromissos.filter((item) => item.id !== compromisso.id);
+  persistir();
+  renderizar();
+  avisar("Compromisso excluído.");
+}
+
+// ---------------------------------------------------------------- eventos
+
+/**
+ * Um ouvinte por tipo de evento, na raiz. Antes, cada `render()` reanexava
+ * dezenas de ouvintes — o que também obrigava a redesenhar tudo a cada tecla da
+ * busca, e por isso o cursor precisava ser recolocado na mão.
+ */
+function ligarEventos(): void {
+  app.addEventListener("click", (evento) => {
+    const alvo = evento.target as HTMLElement | null;
+    if (!alvo) return;
+
+    const passo = alvo.closest<HTMLElement>("[data-passo]");
+    if (passo) {
+      const dias = Number(passo.dataset.passo ?? 0) * (visao === "semana" ? 7 : 1);
+      dataSelecionada = shiftDate(dataSelecionada, dias);
+      renderizar();
+      return;
+    }
+
+    const visaoAlvo = alvo.closest<HTMLElement>("[data-visao]");
+    if (visaoAlvo) {
+      visao = visaoAlvo.dataset.visao === "semana" ? "semana" : "dia";
+      renderizar();
+      return;
+    }
+
+    const filtro = alvo.closest<HTMLElement>("[data-filtro]");
+    if (filtro) {
+      criterios = { ...criterios, status: (filtro.dataset.filtro ?? "todos") as FiltroStatus };
+      renderizar();
+      return;
+    }
+
+    const categoria = alvo.closest<HTMLElement>("[data-categoria]");
+    if (categoria) {
+      const valor = categoria.dataset.categoria ?? "";
+      criterios = { ...criterios, categoria: valor === "" ? null : valor };
+      renderizar();
+      return;
+    }
+
+    const acaoElemento = alvo.closest<HTMLElement>("[data-acao]");
+    if (!acaoElemento) return;
+    const acao = acaoElemento.dataset.acao ?? "";
+    const id = acaoElemento.dataset.id;
+
+    switch (acao) {
+      case "novo":
+        abrirFormulario();
+        break;
+      case "hoje":
+        dataSelecionada = todayISO();
+        renderizar();
+        break;
+      case "abrir-dia": {
+        const data = acaoElemento.dataset.data;
+        if (data) {
+          dataSelecionada = data;
+          visao = "dia";
+          renderizar();
+        }
+        break;
+      }
+      case "exportar":
+        exportar();
+        break;
+      case "configuracoes":
+        abrirConfiguracoes();
+        break;
+      case "tema":
+        alternarTema();
+        break;
+      case "limpar-filtros":
+        criterios = { ...CRITERIOS_PADRAO };
+        renderizar();
+        break;
+      default:
+        if (id) acaoCompromisso(acao, id);
     }
   });
-  reader.readAsText(file);
+
+  app.addEventListener("input", (evento) => {
+    const alvo = evento.target as HTMLElement | null;
+    if (alvo?.id === "search") {
+      criterios = { ...criterios, busca: (alvo as HTMLInputElement).value };
+      renderizarLista();
+    }
+  });
+
+  app.addEventListener("change", (evento) => {
+    const alvo = evento.target as HTMLInputElement | null;
+    if (!alvo) return;
+
+    if (alvo.id === "date-picker" && alvo.value) {
+      dataSelecionada = alvo.value;
+      renderizar();
+      return;
+    }
+
+    if (alvo.id === "import-file") {
+      const arquivo = alvo.files?.[0];
+      // Zerar o campo permite reimportar o mesmo arquivo depois; sem isso o
+      // segundo `change` nunca dispara.
+      alvo.value = "";
+      if (arquivo) importar(arquivo);
+    }
+  });
+
+  document.addEventListener("keydown", (evento) => {
+    if (evento.key !== "n" || evento.ctrlKey || evento.metaKey || evento.altKey) return;
+    const ativo = document.activeElement;
+    const digitando =
+      ativo instanceof HTMLInputElement ||
+      ativo instanceof HTMLTextAreaElement ||
+      ativo instanceof HTMLSelectElement;
+    if (digitando || document.querySelector("dialog[open]")) return;
+    evento.preventDefault();
+    abrirFormulario();
+  });
+
+  window.addEventListener("focus", limparJanelasFechadas);
 }
 
-applyTheme();
-render();
+// ------------------------------------------------------------------- boot
+
+aplicarTema();
+ligarEventos();
+iniciarEscuta(() => origemDe(configuracao.integracao.baseUrl), receberReferencia);
+renderizar();
+
+if (carga.migrado) {
+  avisar("Agenda migrada para o novo formato. Nada foi perdido.");
+}
